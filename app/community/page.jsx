@@ -1,61 +1,108 @@
-'use client'
+"use client"
 
-import { useState, useEffect } from 'react'
-import { Navigation } from '../components/Navigation'
-import { Button } from '@/components/ui/button'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
-import { getAllMemberProfiles, searchMembers } from '@/lib/firebase/profiles'
-import { Search, MessageCircle } from 'lucide-react'
-import { Input } from '@/components/ui/input'
-import { useAuth } from '@/lib/firebase/auth-context'
-import { Loader2 } from 'lucide-react'
+import { useEffect, useState } from "react"
+import { useAuth } from "@/lib/firebase/auth-context"
+import { getAllMemberProfiles } from "@/lib/firebase/profiles"
+import { getOrCreateConversation } from "@/lib/firebase/messages"
+import { Navigation } from "@/components/navigation"
+import { Button } from "@/components/ui/button"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Search, MessageCircle, Loader2 } from "lucide-react"
+import { Input } from "@/components/ui/input"
+import { useRouter } from "next/navigation"
+
+function MessageButton({ otherUserId }) {
+  const { user } = useAuth()
+  const router = useRouter()
+  const [isLoading, setIsLoading] = useState(false)
+
+  const handleClick = async (e) => {
+    e.preventDefault()
+    if (!user || isLoading) return
+
+    setIsLoading(true)
+    try {
+      const conversationId = await getOrCreateConversation({
+        userId1: user.uid,
+        userId2: otherUserId,
+      })
+      router.push(`/messages/${conversationId}`)
+    } catch (error) {
+      console.error('Error creating conversation:', error)
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  return (
+    <Button 
+      size="icon" 
+      variant="outline" 
+      className="rounded-full border-primary/20 bg-transparent"
+      onClick={handleClick}
+      disabled={isLoading}
+    >
+      {isLoading ? (
+        <Loader2 className="w-4 h-4 animate-spin" />
+      ) : (
+        <MessageCircle className="w-4 h-4" />
+      )}
+    </Button>
+  )
+}
 
 export default function CommunityPage() {
-  const { user: currentUser, loading: authLoading } = useAuth()
-  const [members, setMembers] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [searchTerm, setSearchTerm] = useState('')
-  const [isSearching, setIsSearching] = useState(false)
+  const { user, loading: authLoading } = useAuth()
+  const router = useRouter()
+  const [users, setUsers] = useState([])
+  const [searchTerm, setSearchTerm] = useState("")
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (authLoading) return
 
-    const loadMembers = async () => {
-      setIsLoading(true)
-      try {
-        const allMembers = await getAllMemberProfiles()
-        setMembers(allMembers)
-      } catch (error) {
-        console.error('Error loading members:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    loadMembers()
-  }, [authLoading])
-
-  const handleSearch = async (term) => {
-    setSearchTerm(term)
-    if (term.trim().length === 0) {
-      const allMembers = await getAllMemberProfiles()
-      setMembers(allMembers)
+    if (!user) {
+      router.push("/")
       return
     }
 
-    setIsSearching(true)
-    try {
-      const results = await searchMembers(term)
-      setMembers(results)
-    } catch (error) {
-      console.error('Error searching members:', error)
-    } finally {
-      setIsSearching(false)
+    const loadUsers = async () => {
+      try {
+        setLoading(true)
+        const allMembers = await getAllMemberProfiles(100)
+        
+        // Transform members to match component format
+        const transformedUsers = allMembers.map((member) => ({
+          name: member.name || member.email?.split('@')[0] || 'User',
+          handle: `@${member.email?.split('@')[0] || 'user'}`,
+          avatar: member.avatar || "/placeholder.svg",
+          bio: member.bio || "Quantum computing enthusiast",
+          uid: member.uid,
+        }))
+        
+        setUsers(transformedUsers)
+      } catch (error) {
+        console.error('Error loading users:', error)
+      } finally {
+        setLoading(false)
+      }
     }
-  }
 
-  if (authLoading) {
+    loadUsers()
+  }, [user, authLoading, router])
+
+  const filteredUsers = users.filter((u) => {
+    if (!searchTerm) return true
+    const searchLower = searchTerm.toLowerCase()
+    return (
+      u.name.toLowerCase().includes(searchLower) ||
+      u.handle.toLowerCase().includes(searchLower) ||
+      u.bio.toLowerCase().includes(searchLower)
+    )
+  })
+
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -82,54 +129,38 @@ export default function CommunityPage() {
               placeholder="Search members..."
               className="pl-9 bg-card/50 border-primary/20 focus-visible:ring-primary"
               value={searchTerm}
-              onChange={(e) => handleSearch(e.target.value)}
+              onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
         </div>
 
-        {isLoading || isSearching ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : members.length === 0 ? (
-          <div className="bg-card/50 backdrop-blur-sm border border-border rounded-2xl p-12 text-center">
-            <p className="text-foreground/60 mb-4">No members found</p>
-            <p className="text-sm text-foreground/50">
-              {searchTerm ? 'Try a different search term' : 'Be the first to join!'}
-            </p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {members.map((member) => {
-              const isCurrentUser = member.uid === currentUser?.uid
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredUsers.length > 0 ? (
+            filteredUsers.map((memberUser) => {
+              const isCurrentUser = memberUser.uid === user?.uid
               return (
                 <Card
-                  key={member.uid}
+                  key={memberUser.uid}
                   className="bg-card/40 backdrop-blur-sm border-primary/10 hover:border-primary/30 transition-all hover:bg-card/60 group overflow-hidden"
                 >
                   <div className="h-24 bg-gradient-to-br from-primary/20 via-accent/10 to-secondary/20 group-hover:from-primary/30 transition-all" />
                   <CardHeader className="pb-2 relative">
                     <Avatar className="w-20 h-20 border-4 border-background absolute -top-10 shadow-lg">
-                      <AvatarImage src={member.avatar || "/placeholder.svg"} alt={member.name || member.email} />
-                      <AvatarFallback>{(member.name || member.email?.[0] || 'U').toUpperCase()}</AvatarFallback>
+                      <AvatarImage src={memberUser.avatar || "/placeholder.svg"} alt={memberUser.name} />
+                      <AvatarFallback>{memberUser.name[0]}</AvatarFallback>
                     </Avatar>
                     <div className="mt-10 flex justify-between items-start">
                       <div>
-                        <h3 className="font-bold text-lg leading-none">{member.name || member.email?.split('@')[0] || 'User'}</h3>
-                        <p className="text-sm text-muted-foreground">{member.email}</p>
-                        {member.role === 'board' && (
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-primary/20 text-primary font-medium mt-1 inline-block">
-                            Board Member
-                          </span>
-                        )}
+                        <h3 className="font-bold text-lg leading-none">{memberUser.name}</h3>
+                        <p className="text-sm text-muted-foreground">{memberUser.handle}</p>
                       </div>
                       <div className="flex gap-2">
                         {!isCurrentUser && (
-                          <a href={`/messages?userId=${member.uid}`}>
+                          <Link href={`/messages/${memberUser.uid}`}>
                             <Button size="icon" variant="outline" className="rounded-full border-primary/20 bg-transparent">
                               <MessageCircle className="w-4 h-4" />
                             </Button>
-                          </a>
+                          </Link>
                         )}
                         <Button
                           size="sm"
@@ -137,25 +168,27 @@ export default function CommunityPage() {
                           className={isCurrentUser ? "" : "bg-primary/90 hover:bg-primary"}
                           asChild
                         >
-                          <a href={`/profile?userId=${member.uid}`}>
+                          <Link href={isCurrentUser ? "/profile" : `/profile?uid=${memberUser.uid}`}>
                             {isCurrentUser ? "You" : "View"}
-                          </a>
+                          </Link>
                         </Button>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent>
-                    {member.bio ? (
-                      <p className="text-sm text-foreground/80 line-clamp-2 h-10">{member.bio}</p>
-                    ) : (
-                      <p className="text-sm text-muted-foreground line-clamp-2 h-10">No bio yet</p>
-                    )}
+                    <p className="text-sm text-foreground/80 line-clamp-2 h-10">{memberUser.bio}</p>
                   </CardContent>
                 </Card>
               )
-            })}
-          </div>
-        )}
+            })
+          ) : (
+            <div className="col-span-full text-center py-20">
+              <p className="text-muted-foreground">
+                {searchTerm ? `No members found matching "${searchTerm}"` : "No members found"}
+              </p>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   )

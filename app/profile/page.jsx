@@ -1,86 +1,223 @@
-'use client'
+"use client"
 
-import { useState, useEffect } from 'react'
-import { ProfileHeader } from '../components/ProfileHeader'
+import { useEffect, useState } from "react"
+import { useAuth } from "@/lib/firebase/auth-context"
+import { getMemberProfile, getAllMemberProfiles } from "@/lib/firebase/profiles"
+import { getPosts } from "@/lib/firebase/posts"
+import { ProfileHeader } from "@/components/profile-header"
 import { PostCard } from "@/components/ui/post-card"
-import { NewPost } from '../components/NewPost'
+import { NewPost } from "@/components/new-post"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { useAuth } from '@/lib/firebase/auth-context'
-import { getMemberProfile } from '@/lib/firebase/profiles'
-import { subscribeToPosts } from '@/lib/firebase/posts'
-import { Loader2 } from 'lucide-react'
+import { Loader2 } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Card, CardContent } from "@/components/ui/card"
+import { CalendarDays, Mail, GraduationCap, User } from "lucide-react"
 
 export default function ProfilePage() {
-  const [userId, setUserId] = useState(null)
-  const { user: currentUser, loading: authLoading } = useAuth()
+  const { user, loading: authLoading } = useAuth()
+  const router = useRouter()
   const [profile, setProfile] = useState(null)
-  const [userPosts, setUserPosts] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [isLoadingPosts, setIsLoadingPosts] = useState(true)
-  const isOwnProfile = currentUser?.uid === userId
+  const [posts, setPosts] = useState([])
+  const [members, setMembers] = useState([])
+  const [membersLoading, setMembersLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search)
-      const id = params.get('userId')
-      if (!id && currentUser) {
-        setUserId(currentUser.uid)
-      } else {
-        setUserId(id)
-      }
+    if (authLoading) return
+
+    if (!user) {
+      // Redirect to home if not authenticated
+      router.push("/")
+      return
     }
-  }, [currentUser])
-
-  useEffect(() => {
-    if (authLoading || !userId) return
 
     const loadProfile = async () => {
-      setIsLoading(true)
       try {
-        const memberProfile = await getMemberProfile(userId)
-        setProfile(memberProfile)
-      } catch (error) {
-        console.error('Error loading profile:', error)
+        setLoading(true)
+        const memberProfile = await getMemberProfile(user.uid)
+        
+        if (!memberProfile) {
+          // If profile doesn't exist, create a basic one from auth data
+          setProfile({
+            name: user.displayName || user.email?.split('@')[0] || 'User',
+            handle: `@${user.email?.split('@')[0] || 'user'}`,
+            avatar: user.photoURL || "/placeholder.svg",
+            banner: "/placeholder.svg",
+            bio: "Quantum computing enthusiast ⚛️ | Building the future bit by qubit | Member of HQCC",
+            joined: new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+            location: null,
+            website: null,
+            uid: user.uid,
+          })
+        } else {
+          // Transform Firestore profile to match ProfileHeader format
+          const joinedDate = memberProfile.joinedAt?.toDate 
+            ? memberProfile.joinedAt.toDate() 
+            : new Date()
+          
+          setProfile({
+            name: memberProfile.name || user.displayName || user.email?.split('@')[0] || 'User',
+            handle: `@${user.email?.split('@')[0] || 'user'}`,
+            avatar: memberProfile.avatar || user.photoURL || "/placeholder.svg",
+            banner: "/placeholder.svg",
+            bio: memberProfile.bio || "Quantum computing enthusiast ⚛️ | Building the future bit by qubit | Member of HQCC",
+            joined: joinedDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+            location: null,
+            website: null,
+            uid: user.uid,
+          })
+        }
+
+        // Load user's posts
+        const allPosts = await getPosts(100)
+        const userPosts = allPosts.filter((post) => post.authorId === user.uid)
+        
+        // Transform posts to match PostCard format
+        const transformedPosts = userPosts.map((post) => ({
+          id: post.id,
+          user: {
+            name: post.authorName,
+            handle: `@${post.authorEmail?.split('@')[0] || 'user'}`,
+            avatar: "/placeholder.svg",
+          },
+          content: post.content,
+          timestamp: post.createdAt?.toDate 
+            ? formatTimestamp(post.createdAt.toDate())
+            : 'Just now',
+          likes: post.likesCount || 0,
+          comments: 0, // TODO: Get actual comment count
+          shares: 0,
+        }))
+        
+        setPosts(transformedPosts)
+      } catch (err) {
+        console.error('Error loading profile:', err)
+        setError(err.message || 'Failed to load profile')
       } finally {
-        setIsLoading(false)
+        setLoading(false)
       }
     }
 
     loadProfile()
-  }, [userId, authLoading])
+  }, [user, authLoading, router])
 
-  useEffect(() => {
-    if (!userId) return
+  const formatTimestamp = (date) => {
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
 
-    setIsLoadingPosts(true)
-    const unsubscribe = subscribeToPosts((posts) => {
-      const filtered = posts.filter((post) => post.authorId === userId)
-      const transformedPosts = filtered.map(post => ({
-        id: post.id,
-        user: {
-          name: post.authorName || 'User',
-          handle: `@${(post.authorName || post.authorEmail?.split('@')[0] || 'user').toLowerCase().replace(/\s+/g, '_')}`,
-          avatar: null
-        },
-        content: post.content,
-        timestamp: post.createdAt?.toDate ? post.createdAt.toDate().toLocaleString() : 'Just now',
-        likes: post.likesCount || 0,
-        comments: post.commentsCount || 0,
-        shares: 0,
-        authorName: post.authorName,
-        authorEmail: post.authorEmail,
-        likesCount: post.likesCount || 0,
-        commentsCount: post.commentsCount || 0,
-        createdAt: post.createdAt
-      }))
-      setUserPosts(transformedPosts)
-      setIsLoadingPosts(false)
-    })
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins}m`
+    if (diffHours < 24) return `${diffHours}h`
+    if (diffDays < 7) return `${diffDays}d`
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
 
-    return () => unsubscribe()
-  }, [userId])
+  const formatJoinDate = (timestamp) => {
+    if (!timestamp) return 'Unknown'
+    const date = timestamp?.toDate ? timestamp.toDate() : new Date(timestamp)
+    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  }
 
-  if (authLoading || isLoading || !userId) {
+  // Members tab component
+  function MembersTab({ members, membersLoading, setMembers, setMembersLoading }) {
+    useEffect(() => {
+      const loadMembers = async () => {
+        if (members.length > 0) return // Already loaded
+        
+        try {
+          setMembersLoading(true)
+          const allMembers = await getAllMemberProfiles(100)
+          setMembers(allMembers)
+        } catch (error) {
+          console.error('Error loading members:', error)
+        } finally {
+          setMembersLoading(false)
+        }
+      }
+      loadMembers()
+    }, [])
+
+    if (membersLoading) {
+      return (
+        <div className="p-8 flex items-center justify-center">
+          <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        </div>
+      )
+    }
+
+    if (members.length === 0) {
+      return (
+        <div className="p-8 text-center text-muted-foreground">
+          <p>No members found.</p>
+        </div>
+      )
+    }
+
+    return (
+      <div className="p-4 space-y-3">
+        {members.map((member) => (
+          <Card key={member.uid} className="bg-card/50 border-border/50 hover:border-primary/30 transition-all">
+            <CardContent className="p-4">
+              <div className="flex items-start gap-4">
+                <Avatar className="w-12 h-12 border-2 border-primary/20">
+                  <AvatarImage src={member.avatar || "/placeholder.svg"} alt={member.name || 'User'} />
+                  <AvatarFallback>
+                    {(member.name || member.email?.[0] || 'U').toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-bold text-base leading-none truncate">
+                        {member.name || member.email?.split('@')[0] || 'User'}
+                      </h3>
+                      <div className="flex items-center gap-1 mt-1 text-sm text-muted-foreground">
+                        <Mail className="w-3 h-3" />
+                        <span className="truncate">{member.email}</span>
+                      </div>
+                    </div>
+                    {member.role === 'board' && (
+                      <span className="px-2 py-0.5 text-xs font-medium bg-primary/20 text-primary rounded-full">
+                        Board
+                      </span>
+                    )}
+                  </div>
+                  
+                  <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
+                    {member.year && (
+                      <div className="flex items-center gap-1">
+                        <GraduationCap className="w-4 h-4" />
+                        <span>{member.year}</span>
+                      </div>
+                    )}
+                    {member.major && (
+                      <div className="flex items-center gap-1">
+                        <User className="w-4 h-4" />
+                        <span>{member.major}</span>
+                      </div>
+                    )}
+                    {member.joinedAt && (
+                      <div className="flex items-center gap-1">
+                        <CalendarDays className="w-4 h-4" />
+                        <span>Joined {formatJoinDate(member.joinedAt)}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    )
+  }
+
+  if (authLoading || loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -88,50 +225,36 @@ export default function ProfilePage() {
     )
   }
 
-  if (!profile) {
+  if (error || !profile) {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <div className="text-center py-20">
-            <p className="text-foreground/60 mb-4">Profile not found</p>
-            <a href="/community" className="text-primary hover:underline">
-              Back to Community
-            </a>
-          </div>
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-foreground/60 mb-4">{error || 'Profile not found'}</p>
+          <a href="/" className="text-primary hover:underline">
+            Go to Home
+          </a>
         </div>
       </div>
     )
-  }
-
-  const profileUser = {
-    name: profile.name || profile.email?.split('@')[0] || 'User',
-    handle: `@${(profile.name || profile.email?.split('@')[0] || 'user').toLowerCase().replace(/\s+/g, '_')}`,
-    avatar: profile.avatar,
-    bio: profile.bio,
-    location: profile.location,
-    website: profile.website,
-    joinedAt: profile.joinedAt,
-    uid: profile.uid,
-    id: profile.uid
   }
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <main className="max-w-2xl mx-auto pb-10 min-h-screen border-x border-border shadow-2xl bg-card/30 backdrop-blur-md">
         <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border px-4 py-3">
-          <h2 className="font-bold text-lg">{profileUser.name}</h2>
-          <p className="text-xs text-muted-foreground">{userPosts.length} posts</p>
+          <h2 className="font-bold text-lg">{profile.name}</h2>
+          <p className="text-xs text-muted-foreground">{posts.length} posts</p>
         </div>
 
-        <ProfileHeader user={profileUser} isOwnProfile={isOwnProfile} />
+        <ProfileHeader user={profile} isOwnProfile={true} />
 
         <Tabs defaultValue="posts" className="w-full mt-2">
           <TabsList className="w-full justify-between bg-transparent border-b border-border rounded-none h-auto p-0">
-            {["Posts", "Replies", "Highlights", "Media", "Likes"].map((tab) => (
+            {["Posts", "Replies", "Highlights", "Media", "Likes", "Members"].map((tab) => (
               <TabsTrigger
                 key={tab}
                 value={tab.toLowerCase()}
-                className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground text-muted-foreground py-3 hover:bg-muted/30 transition-colors"
+                className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground text-muted-foreground py-3 hover:bg-muted/30 transition-colors text-xs sm:text-sm"
               >
                 {tab}
               </TabsTrigger>
@@ -139,21 +262,44 @@ export default function ProfilePage() {
           </TabsList>
 
           <TabsContent value="posts" className="m-0">
-            {isOwnProfile && <NewPost user={currentUser} />}
-            {isLoadingPosts ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              </div>
-            ) : userPosts.length === 0 ? (
-              <div className="p-8 text-center text-muted-foreground">
-                <p>No posts yet</p>
-              </div>
-            ) : (
-              userPosts.map((post) => (
+            <NewPost user={profile} onPostCreated={() => {
+              // Reload posts after creating a new one
+              const reloadPosts = async () => {
+                try {
+                  const allPosts = await getPosts(100)
+                  const userPosts = allPosts.filter((post) => post.authorId === user.uid)
+                  const transformedPosts = userPosts.map((post) => ({
+                    id: post.id,
+                    user: {
+                      name: post.authorName,
+                      handle: `@${post.authorEmail?.split('@')[0] || 'user'}`,
+                      avatar: "/placeholder.svg",
+                    },
+                    content: post.content,
+                    timestamp: post.createdAt?.toDate 
+                      ? formatTimestamp(post.createdAt.toDate())
+                      : 'Just now',
+                    likes: post.likesCount || 0,
+                    comments: 0,
+                    shares: 0,
+                  }))
+                  setPosts(transformedPosts)
+                } catch (err) {
+                  console.error('Error reloading posts:', err)
+                }
+              }
+              reloadPosts()
+            }} />
+            {posts.length > 0 ? (
+              posts.map((post) => (
                 <PostCard key={post.id} post={post} />
               ))
+            ) : (
+              <div className="p-8 text-center text-muted-foreground">
+                <p>No posts yet. Start sharing your quantum journey!</p>
+              </div>
             )}
-            {userPosts.length > 0 && (
+            {posts.length > 0 && (
               <div className="p-8 text-center text-muted-foreground">
                 <p>End of posts</p>
               </div>
@@ -174,6 +320,15 @@ export default function ProfilePage() {
 
           <TabsContent value="likes" className="m-0 p-8 text-center text-muted-foreground">
             No likes visible.
+          </TabsContent>
+
+          <TabsContent value="members" className="m-0">
+            <MembersTab 
+              members={members}
+              membersLoading={membersLoading}
+              setMembers={setMembers}
+              setMembersLoading={setMembersLoading}
+            />
           </TabsContent>
         </Tabs>
       </main>

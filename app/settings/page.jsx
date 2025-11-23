@@ -1,6 +1,6 @@
 'use client'
 
-import { AppSidebarContent } from '../components/AppSidebar'
+import { AppSidebarContent } from '@/components/app-sidebar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'

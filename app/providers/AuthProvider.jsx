@@ -11,6 +11,7 @@ import {
 
 import { AuthContext } from '@/lib/firebase/auth-context';
 import { auth } from '@/lib/firebase/client';
+import { saveMemberProfile } from '@/lib/firebase/db';
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -49,6 +50,21 @@ export function AuthProvider({ children }) {
 
         if (profileFields?.displayName) {
           await updateProfile(credential.user, { displayName: profileFields.displayName });
+        }
+
+        // Create member profile in Firestore
+        try {
+          await saveMemberProfile({
+            uid: credential.user.uid,
+            email: credential.user.email || email,
+            name: profileFields?.displayName || profileFields?.name || null,
+            year: profileFields?.year || null,
+            major: profileFields?.major || null,
+            role: 'member',
+          });
+        } catch (profileError) {
+          console.error('Error creating member profile:', profileError);
+          // Don't throw - auth succeeded, profile creation can be retried later
         }
 
         return credential.user;

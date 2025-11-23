@@ -1,9 +1,9 @@
-import { About } from "./components/About";
-import { Activities } from "./components/Activities";
-import { Hero } from "./components/Hero";
-import { Join } from "./components/Join";
-import { Navigation } from "./components/Navigation";
-import { Team } from "./components/Team";
+import { Hero } from "@/components/hero"
+import { About } from "@/components/about"
+import { Activities } from "@/components/activities"
+import { Team } from "@/components/team"
+// import { Join } from "@/components/join"
+import { Navigation } from "@/components/navigation"
 
 export default function Home() {
   return (
@@ -13,7 +13,7 @@ export default function Home() {
       <About />
       <Activities />
       <Team />
-      <Join />
+      {/* <Join /> */}
     </div>
   )
 }

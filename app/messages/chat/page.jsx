@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Send, ImageIcon, Smile, Menu, ArrowLeft } from 'lucide-react'
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { AppSidebarContent } from '../../components/AppSidebar'
+import { AppSidebarContent } from '@/components/app-sidebar'
 import { useAuth } from '@/lib/firebase/auth-context'
 import { getDoc, doc } from 'firebase/firestore'
 import { sendMessage, subscribeToMessages } from '@/lib/firebase/messages'
@@ -104,7 +104,7 @@ export default function ChatPage() {
   }
 
   const otherUserId = conversation.participants?.find(p => p !== user?.uid) || conversation.participants?.[0]
-  const otherUser = otherUserId ? { uid: otherUserId } : null
+  const otherUser = otherUserId ? { uid: otherUserId, email: null, avatar: null, name: null } : null
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground">
@@ -126,12 +126,12 @@ export default function ChatPage() {
           <ArrowLeft className="w-6 h-6" />
         </button>
         <Avatar className="w-10 h-10">
-          <AvatarImage src={otherUser?.avatar || "/placeholder.svg"} alt={otherUser?.email || 'User'} />
-          <AvatarFallback>{(otherUser?.email?.[0] || 'U').toUpperCase()}</AvatarFallback>
+          <AvatarImage src={otherUser?.avatar || "/placeholder.svg"} alt={otherUser?.email || otherUser?.name || 'User'} />
+          <AvatarFallback>{(otherUser?.name || otherUser?.email?.[0] || 'U').toUpperCase()}</AvatarFallback>
         </Avatar>
         <div>
           <h1 className="font-bold">{otherUser?.email?.split('@')[0] || 'User'}</h1>
-          <p className="text-xs text-muted-foreground">{otherUser?.email}</p>
+          <p className="text-xs text-muted-foreground">{otherUser?.email || ''}</p>
         </div>
       </header>
 
