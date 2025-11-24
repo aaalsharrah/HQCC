@@ -1,41 +1,49 @@
-"use client"
+'use client';
 
-import { useState, useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Menu, X } from "lucide-react"
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Menu, X } from 'lucide-react';
+import Link from 'next/link';
 
 export function Navigation() {
-  const [isOpen, setIsOpen] = useState(false)
-  const [scrolled, setScrolled] = useState(false)
+  const [isOpen, setIsOpen] = useState(false);
+  const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     const handleScroll = () => {
-      setScrolled(window.scrollY > 20)
-    }
-    window.addEventListener("scroll", handleScroll)
-    return () => window.removeEventListener("scroll", handleScroll)
-  }, [])
+      setScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const navItems = [
-    { label: "About", href: "#about" },
-    { label: "Activities", href: "#activities" },
-    { label: "Team", href: "#team" },
-    { label: "Join", href: "#join" },
-  ]
+    { label: 'About', href: '#about' },
+    { label: 'Activities', href: '#activities' },
+    { label: 'Team', href: '#team' },
+    { label: 'Event', href: '/events' },
+    { label: 'TimeLine', href: '/timeline' },
+    { label: 'community', href: '/community' },
+  ];
 
   return (
     <nav
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-        scrolled ? "bg-card/80 backdrop-blur-xl shadow-lg border-b border-border" : "bg-transparent"
+        scrolled
+          ? 'bg-card/80 backdrop-blur-xl shadow-lg border-b border-border'
+          : 'bg-transparent'
       }`}
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
-          <a href="#" className="text-2xl font-bold tracking-tight transition-colors hover:text-primary">
+          <Link
+            href="/"
+            className="text-2xl font-bold tracking-tight transition-colors hover:text-primary"
+          >
             <span className="bg-linear-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
               HQCC
             </span>
-          </a>
+          </Link>
 
           <div className="hidden md:flex items-center gap-8">
             {navItems.map((item) => (
@@ -48,14 +56,26 @@ export function Navigation() {
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all group-hover:w-full" />
               </a>
             ))}
-            <Button asChild className="bg-primary hover:bg-primary/90 text-primary-foreground">
-              <a href="#join">Join Club</a>
+            <Button
+              asChild
+              className="bg-primary hover:bg-primary/90 text-primary-foreground"
+            >
+              <a href="/signin">Sign In</a>
             </Button>
           </div>
 
           <div className="md:hidden">
-            <Button variant="ghost" size="icon" onClick={() => setIsOpen(!isOpen)} className="text-foreground">
-              {isOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsOpen(!isOpen)}
+              className="text-foreground"
+            >
+              {isOpen ? (
+                <X className="h-6 w-6" />
+              ) : (
+                <Menu className="h-6 w-6" />
+              )}
             </Button>
           </div>
         </div>
@@ -75,13 +95,16 @@ export function Navigation() {
               </a>
             ))}
             <div className="px-3 pt-2">
-              <Button asChild className="w-full bg-primary hover:bg-primary/90 text-primary-foreground">
-                <a href="#join">Join Club</a>
+              <Button
+                asChild
+                className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+              >
+                <a href="/signin">Sign In</a>
               </Button>
             </div>
           </div>
         </div>
       )}
     </nav>
-  )
+  );
 }
