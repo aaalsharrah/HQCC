@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -17,21 +18,20 @@ import {
   Calendar,
   LinkIcon,
   MoreHorizontal,
-  UserPlus,
 } from 'lucide-react';
 import { Navigation } from '@/app/components/Navigation';
 
+// 🔥 adjust this path if your firebase file is elsewhere
 import { auth, db } from '@/app/lib/firebase/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 
 export default function ProfilePage({ params }) {
   const router = useRouter();
-  const { id } = params || {}; // this is the uid from the URL
+  const { id } = params || {}; // uid from URL: /member/profile/[id]
 
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
-  const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const mediaPosts = posts.filter((p) => p.image);
@@ -47,7 +47,7 @@ export default function ProfilePage({ params }) {
       }
 
       try {
-        const ref = doc(db, 'profiles', id);
+        const ref = doc(db, 'members', id);
         const snap = await getDoc(ref);
 
         if (!snap.exists()) {
@@ -74,7 +74,6 @@ export default function ProfilePage({ params }) {
             joined: 'September 2023',
             following: 0,
             followers: 0,
-            isFollowing: false,
           });
         } else {
           const data = snap.data();
@@ -82,18 +81,22 @@ export default function ProfilePage({ params }) {
           setProfile({
             uid: id,
             name: data.name || 'HQCC Member',
-            username: data.username || 'member',
-            avatar: data.avatar || '/quantum-computing-student.jpg',
+            username: data.username || 'member', // 🔥 pulled from Firestore
+            email: data.email || user.email || '',
+            avatar:
+              data.avatar ||
+              user.photoURL ||
+              '/quantum-computing-student.jpg',
             coverImage:
               data.coverImage ||
               '/quantum-computing-chip-with-glowing-circuits-and-b.jpg',
-            bio: data.bio || 'HQCC member | Quantum & Computing Enthusiast',
+            bio:
+              data.bio || 'HQCC member | Quantum & Computing Enthusiast',
             location: data.location || 'Hempstead, NY',
             website: data.website || 'hqcc.hofstra.edu',
             joined: 'September 2023', // later: format data.createdAt
             following: data.following || 0,
             followers: data.followers || 0,
-            isFollowing: false,
           });
         }
 
@@ -111,8 +114,6 @@ export default function ProfilePage({ params }) {
             isBookmarked: false,
           },
         ]);
-
-        setIsFollowing(false);
       } catch (err) {
         console.error('Error loading profile:', err);
       } finally {
@@ -158,7 +159,7 @@ export default function ProfilePage({ params }) {
         </Avatar>
         <div className="flex-1">
           <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 ">
               <h3 className="font-semibold text-foreground">{profile.name}</h3>
               <span className="text-xs text-muted-foreground">
                 @{profile.username}
@@ -285,20 +286,20 @@ export default function ProfilePage({ params }) {
               </Avatar>
             </div>
 
-            {/* Follow / Unfollow */}
+            {/* Edit Profile button */}
             <div className="flex justify-end pt-4">
-              <Button
-                variant={isFollowing ? 'outline' : 'default'}
-                onClick={() => setIsFollowing(!isFollowing)}
-                className={
-                  isFollowing
-                    ? 'border-primary/30 hover:bg-red-500/10 hover:text-red-500 hover:border-red-500/50'
-                    : 'bg-primary hover:bg-primary/90 text-primary-foreground'
-                }
-              >
-                <UserPlus className="h-4 w-4 mr-2" />
-                {isFollowing ? 'Following' : 'Follow'}
-              </Button>
+              <Link href="/member/settings">
+                <Button
+                  className="
+                    bg-gradient-to-r from-primary via-accent to-secondary
+                    text-white font-medium
+                    hover:opacity-90
+                    transition-all
+                  "
+                >
+                  Edit Profile
+                </Button>
+              </Link>
             </div>
 
             {/* Profile Info */}
