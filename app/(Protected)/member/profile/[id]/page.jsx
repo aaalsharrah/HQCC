@@ -1,6 +1,9 @@
 'use client';
 
-import { useState, use } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -17,80 +20,108 @@ import {
   UserPlus,
 } from 'lucide-react';
 import { Navigation } from '@/app/components/Navigation';
-import Image from 'next/image';
 
-const mockProfile = {
-  name: 'Abdallah Aisharrah',
-  username: 'abdallah_ai',
-  avatar: '/quantum-computing-student.jpg',
-  coverImage: '/quantum-computing-chip-with-glowing-circuits-and-b.jpg',
-  bio: 'Founder & President of HQCC | Quantum Computing Enthusiast | Building the future of computing at Hofstra University',
-  location: 'Hempstead, NY',
-  website: 'hqcc.hofstra.edu',
-  joined: 'September 2023',
-  following: 324,
-  followers: 892,
-  isFollowing: false,
-};
+import { auth, db } from '@/app/lib/firebase/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc } from 'firebase/firestore';
 
-const mockPosts = [
-  {
-    id: '1',
-    content:
-      "Excited to announce our upcoming Quantum Hackathon! We'll be working with IBM Qiskit to build real quantum algorithms. Registration opens next week!",
-    image: '/quantum-computing-chip-with-glowing-circuits-and-b.jpg',
-    timestamp: '2h ago',
-    likes: 42,
-    comments: 12,
-    shares: 5,
-    isLiked: false,
-    isBookmarked: false,
-  },
-  {
-    id: '2',
-    content:
-      "Great turnout at today's workshop! Love seeing everyone so passionate about quantum computing. Can't wait for the next session.",
-    timestamp: '1d ago',
-    likes: 67,
-    comments: 15,
-    shares: 8,
-    isLiked: true,
-    isBookmarked: false,
-  },
-  {
-    id: '3',
-    content:
-      "Just finished implementing Shor's algorithm on our quantum simulator. The results are fascinating! Check out our GitHub for the code.",
-    image: '/quantum-algorithm-code-screen.jpg',
-    timestamp: '3d ago',
-    likes: 93,
-    comments: 24,
-    shares: 31,
-    isLiked: false,
-    isBookmarked: true,
-  },
-  {
-    id: '4',
-    content:
-      "Reminder: Weekly study group tomorrow at 6 PM. We'll be diving deep into quantum entanglement. Bring your questions!",
-    timestamp: '4d ago',
-    likes: 28,
-    comments: 9,
-    shares: 3,
-    isLiked: false,
-    isBookmarked: false,
-  },
-];
+export default function ProfilePage({ params }) {
+  const router = useRouter();
+  const { id } = params || {}; // this is the uid from the URL
 
-const mockMediaPosts = mockPosts.filter((p) => p.image);
-const mockLikedPosts = mockPosts.filter((p) => p.isLiked);
+  const [profile, setProfile] = useState(null);
+  const [posts, setPosts] = useState([]);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-export default function ProfilePage(props) {
-  const params = use(props.params);
-  const { username } = params;
-  const [profile] = useState(mockProfile);
-  const [posts, setPosts] = useState(mockPosts);
-  const [isFollowing, setIsFollowing] = useState(profile.isFollowing);
+  const mediaPosts = posts.filter((p) => p.image);
+  const likedPosts = posts.filter((p) => p.isLiked);
+
+  useEffect(() => {
+    if (!id) return;
+
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (!user) {
+        router.push('/signin');
+        return;
+      }
+
+      try {
+        const ref = doc(db, 'profiles', id);
+        const snap = await getDoc(ref);
+
+        if (!snap.exists()) {
+          // Fallback profile if doc missing
+          const fallbackName =
+            user.displayName || user.email?.split('@')[0] || 'HQCC Member';
+          const username =
+            user.email
+              ?.split('@')[0]
+              ?.toLowerCase()
+              .replace(/[^a-z0-9]/g, '') || 'member';
+
+          setProfile({
+            uid: user.uid,
+            name: fallbackName,
+            email: user.email,
+            username,
+            avatar: user.photoURL || '/quantum-computing-student.jpg',
+            coverImage:
+              '/quantum-computing-chip-with-glowing-circuits-and-b.jpg',
+            bio: 'HQCC member | Quantum & Computing Enthusiast',
+            location: 'Hempstead, NY',
+            website: 'hqcc.hofstra.edu',
+            joined: 'September 2023',
+            following: 0,
+            followers: 0,
+            isFollowing: false,
+          });
+        } else {
+          const data = snap.data();
+
+          setProfile({
+            uid: id,
+            name: data.name || 'HQCC Member',
+            username: data.username || 'member',
+            avatar: data.avatar || '/quantum-computing-student.jpg',
+            coverImage:
+              data.coverImage ||
+              '/quantum-computing-chip-with-glowing-circuits-and-b.jpg',
+            bio: data.bio || 'HQCC member | Quantum & Computing Enthusiast',
+            location: data.location || 'Hempstead, NY',
+            website: data.website || 'hqcc.hofstra.edu',
+            joined: 'September 2023', // later: format data.createdAt
+            following: data.following || 0,
+            followers: data.followers || 0,
+            isFollowing: false,
+          });
+        }
+
+        // Seed a simple welcome post for now
+        setPosts([
+          {
+            id: '1',
+            content:
+              'Welcome to your HQCC profile! Soon you will be able to customize your bio and posts.',
+            timestamp: 'just now',
+            likes: 0,
+            comments: 0,
+            shares: 0,
+            isLiked: false,
+            isBookmarked: false,
+          },
+        ]);
+
+        setIsFollowing(false);
+      } catch (err) {
+        console.error('Error loading profile:', err);
+      } finally {
+        setLoading(false);
+      }
+    });
+
+    return () => unsub();
+  }, [id, router]);
 
   const handleLike = (postId, postsArray, setPostsArray) => {
     setPostsArray(
@@ -121,7 +152,9 @@ export default function ProfilePage(props) {
       <div className="flex items-start gap-4 mb-4">
         <Avatar className="h-12 w-12 ring-2 ring-primary/20">
           <AvatarImage src={profile.avatar || '/placeholder.svg'} />
-          <AvatarFallback>{profile.name.slice(0, 2)}</AvatarFallback>
+          <AvatarFallback>
+            {profile.name ? profile.name.slice(0, 2) : 'HQ'}
+          </AvatarFallback>
         </Avatar>
         <div className="flex-1">
           <div className="flex items-center justify-between mb-1">
@@ -151,8 +184,8 @@ export default function ProfilePage(props) {
             src={post.image || '/placeholder.svg'}
             alt="Post content"
             className="w-full h-auto"
-            width={196}
-            height={10}
+            width={600}
+            height={400}
           />
         </div>
       )}
@@ -208,6 +241,14 @@ export default function ProfilePage(props) {
     </Card>
   );
 
+  if (loading || !profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <p className="text-muted-foreground">Loading profile...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <Navigation />
@@ -228,8 +269,8 @@ export default function ProfilePage(props) {
               src={profile.coverImage || '/placeholder.svg'}
               alt="Cover"
               className="w-full h-full object-cover opacity-50"
-              width={196}
-              height={10}
+              width={1200}
+              height={400}
             />
           </div>
 
@@ -239,7 +280,7 @@ export default function ProfilePage(props) {
               <Avatar className="h-32 w-32 md:h-40 md:w-40 ring-4 ring-card border-4 border-background">
                 <AvatarImage src={profile.avatar || '/placeholder.svg'} />
                 <AvatarFallback className="text-3xl">
-                  {profile.name.slice(0, 2)}
+                  {profile.name ? profile.name.slice(0, 2) : 'HQ'}
                 </AvatarFallback>
               </Avatar>
             </div>
@@ -282,8 +323,13 @@ export default function ProfilePage(props) {
 
                 {profile.website && (
                   <a
-                    href={`https://${profile.website}`}
+                    href={
+                      profile.website.startsWith('http')
+                        ? profile.website
+                        : `https://${profile.website}`
+                    }
                     target="_blank"
+                    rel="noreferrer"
                     className="flex items-center gap-1 hover:text-primary transition-colors"
                   >
                     <LinkIcon className="h-4 w-4" />
@@ -373,9 +419,9 @@ export default function ProfilePage(props) {
           </TabsContent>
 
           <TabsContent value="media" className="space-y-6">
-            {mockMediaPosts.length > 0 ? (
+            {mediaPosts.length > 0 ? (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {mockMediaPosts.map((post) => (
+                {mediaPosts.map((post) => (
                   <div
                     key={post.id}
                     className="relative aspect-square rounded-lg overflow-hidden border border-border/50 group cursor-pointer"
@@ -414,12 +460,12 @@ export default function ProfilePage(props) {
           </TabsContent>
 
           <TabsContent value="likes" className="space-y-6">
-            {mockLikedPosts.length > 0 ? (
-              mockLikedPosts.map((post) => (
+            {likedPosts.length > 0 ? (
+              likedPosts.map((post) => (
                 <PostCard
                   key={post.id}
                   post={post}
-                  postsArray={mockLikedPosts}
+                  postsArray={likedPosts}
                   setPostsArray={() => {}}
                 />
               ))

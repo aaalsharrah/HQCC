@@ -6,6 +6,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, Mail, Lock, User } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+
+import { auth, db } from '@/app/lib/firebase/firebase';
+import {
+  createUserWithEmailAndPassword,
+  updateProfile,
+  GoogleAuthProvider,
+  GithubAuthProvider,
+  signInWithPopup,
+} from 'firebase/auth';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 
 export default function SignUpPage() {
   const [formData, setFormData] = useState({
@@ -14,14 +25,104 @@ export default function SignUpPage() {
     password: '',
     confirmPassword: '',
   });
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    console.log('Sign up with:', formData);
-  };
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const router = useRouter();
 
   const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  };
+
+  const createProfileDoc = async (user, name) => {
+    const username =
+      user.email
+        ?.split('@')[0]
+        ?.toLowerCase()
+        .replace(/[^a-z0-9]/g, '') || 'member';
+
+    await setDoc(doc(db, 'profiles', user.uid), {
+      uid: user.uid,
+      name: name || username,
+      email: user.email,
+      username,
+      bio: '',
+      location: '',
+      website: '',
+      avatar: user.photoURL || null,
+      coverImage: null,
+      createdAt: serverTimestamp(),
+    });
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords don't match.");
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      setError('Password should be at least 6 characters.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const { email, password, name } = formData;
+
+      const userCred = await createUserWithEmailAndPassword(
+        auth,
+        email,
+        password
+      );
+
+      await updateProfile(userCred.user, {
+        displayName: name,
+      });
+
+      await createProfileDoc(userCred.user, name);
+
+      router.push(`/member/profile/${userCred.user.uid}`);
+    } catch (err) {
+      console.error(err);
+
+      if (err.code === 'auth/email-already-in-use') {
+        setError('This email is already in use. Try signing in instead.');
+      } else if (err.code === 'auth/invalid-email') {
+        setError('Invalid email address.');
+      } else {
+        setError('Failed to create account. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleProviderSignUp = async (providerName) => {
+    setError('');
+    setLoading(true);
+
+    try {
+      const provider =
+        providerName === 'google'
+          ? new GoogleAuthProvider()
+          : new GithubAuthProvider();
+
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      await createProfileDoc(user, user.displayName);
+
+      router.push(`/member/profile/${user.uid}`);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to sign up with provider. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -66,6 +167,12 @@ export default function SignUpPage() {
               Create your account to get started
             </p>
           </div>
+
+          {error && (
+            <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {error}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
@@ -182,9 +289,10 @@ export default function SignUpPage() {
 
             <Button
               type="submit"
-              className="w-full h-12 bg-gradient-to-r from-primary via-accent to-secondary hover:opacity-90 text-white font-medium text-base transition-all"
+              disabled={loading}
+              className="w-full h-12 bg-gradient-to-r from-primary via-accent to-secondary hover:opacity-90 text-white font-medium text-base transition-all disabled:opacity-60"
             >
-              Create Account
+              {loading ? 'Creating account...' : 'Create Account'}
             </Button>
           </form>
 
@@ -201,9 +309,13 @@ export default function SignUpPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <Button
+              type="button"
               variant="outline"
+              disabled={loading}
+              onClick={() => handleProviderSignUp('google')}
               className="h-12 border-border hover:bg-primary/5 hover:border-primary transition-all bg-transparent"
             >
+              {/* Google icon */}
               <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
                 <path
                   fill="currentColor"
@@ -225,9 +337,13 @@ export default function SignUpPage() {
               Google
             </Button>
             <Button
+              type="button"
               variant="outline"
+              disabled={loading}
+              onClick={() => handleProviderSignUp('github')}
               className="h-12 border-border hover:bg-primary/5 hover:border-primary transition-all bg-transparent"
             >
+              {/* GitHub icon */}
               <svg
                 className="mr-2 h-5 w-5"
                 fill="currentColor"

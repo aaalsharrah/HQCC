@@ -19,13 +19,14 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 const navItems = [
   { label: 'Home', href: '/', icon: Home },
-  { label: 'Timeline', href: '/timeline', icon: Clock },
-  { label: 'Community', href: '/community', icon: User },
-  { label: 'Events', href: '/events', icon: User },
-  { label: 'Messages', href: '/messages', icon: MessageCircle },
-  { label: 'Notifications', href: '/notifications', icon: Bell },
+  { label: 'Timeline', href: '/member/timeline', icon: Clock },
+  { label: 'Community', href: '/member/community', icon: User },
+  { label: 'Events', href: '/member/events', icon: User },
+  { label: 'Messages', href: '/member/messages', icon: MessageCircle },
+  { label: 'Notifications', href: '/member/notifications', icon: Bell },
 
-  { label: 'Profile', href: '/profile/test', icon: User },
+  { label: 'Profile', href: '/member/profile/test', icon: User },
+  { label: 'Settings', href: '/member/settings', icon: User },
 ];
 
 export default function Sidebar() {

@@ -6,14 +6,85 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowLeft, Mail, Lock } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+
+import { auth } from '@/app/lib/firebase/firebase';
+import {
+  signInWithEmailAndPassword,
+  GoogleAuthProvider,
+  GithubAuthProvider,
+  signInWithPopup,
+  setPersistence,
+  browserLocalPersistence,
+  browserSessionPersistence,
+} from 'firebase/auth';
 
 export default function SignInPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const router = useRouter();
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log('Sign in with:', email, password);
+    setError('');
+    setLoading(true);
+
+    try {
+      await setPersistence(
+        auth,
+        rememberMe ? browserLocalPersistence : browserSessionPersistence
+      );
+
+      await signInWithEmailAndPassword(auth, email, password);
+      const user = auth.currentUser;
+
+      if (!user) throw new Error('No user after sign in');
+
+      // 🔁 redirect to their own profile using uid
+      router.push(`/member/profile/${user.uid}`);
+    } catch (err) {
+      console.error(err);
+      if (
+        err.code === 'auth/wrong-password' ||
+        err.code === 'auth/user-not-found'
+      ) {
+        setError('Invalid email or password.');
+      } else {
+        setError('Failed to sign in. Please try again.');
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleProviderSignIn = async (providerName) => {
+    setError('');
+    setLoading(true);
+
+    try {
+      const provider =
+        providerName === 'google'
+          ? new GoogleAuthProvider()
+          : new GithubAuthProvider();
+
+      await setPersistence(
+        auth,
+        rememberMe ? browserLocalPersistence : browserSessionPersistence
+      );
+
+      const result = await signInWithPopup(auth, provider);
+      const user = result.user;
+
+      router.push(`/member/profile/${user.uid}`);
+    } catch (err) {
+      console.error(err);
+      setError('Failed to sign in with provider. Please try again.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -58,6 +129,12 @@ export default function SignInPage() {
               Sign in to your HQCC account
             </p>
           </div>
+
+          {error && (
+            <div className="mb-4 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+              {error}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-2">
@@ -107,6 +184,8 @@ export default function SignInPage() {
                 <input
                   type="checkbox"
                   className="w-4 h-4 rounded border-border accent-primary"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
                 />
                 <span className="text-muted-foreground">Remember me</span>
               </label>
@@ -120,9 +199,10 @@ export default function SignInPage() {
 
             <Button
               type="submit"
-              className="w-full h-12 bg-gradient-to-r from-primary via-accent to-secondary hover:opacity-90 text-white font-medium text-base transition-all"
+              disabled={loading}
+              className="w-full h-12 bg-gradient-to-r from-primary via-accent to-secondary hover:opacity-90 text-white font-medium text-base transition-all disabled:opacity-60"
             >
-              Sign In
+              {loading ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
 
@@ -139,9 +219,13 @@ export default function SignInPage() {
 
           <div className="grid grid-cols-2 gap-3">
             <Button
+              type="button"
               variant="outline"
+              disabled={loading}
+              onClick={() => handleProviderSignIn('google')}
               className="h-12 border-border hover:bg-primary/5 hover:border-primary transition-all bg-transparent"
             >
+              {/* Google icon */}
               <svg className="mr-2 h-5 w-5" viewBox="0 0 24 24">
                 <path
                   fill="currentColor"
@@ -162,10 +246,15 @@ export default function SignInPage() {
               </svg>
               Google
             </Button>
+
             <Button
+              type="button"
               variant="outline"
+              disabled={loading}
+              onClick={() => handleProviderSignIn('github')}
               className="h-12 border-border hover:bg-primary/5 hover:border-primary transition-all bg-transparent"
             >
+              {/* GitHub icon */}
               <svg
                 className="mr-2 h-5 w-5"
                 fill="currentColor"
@@ -180,7 +269,7 @@ export default function SignInPage() {
           <div className="mt-6 text-center text-sm">
             <span className="text-muted-foreground">
               Don&apos;t have an account?
-            </span>
+            </span>{' '}
             <Link
               href="/signup"
               className="text-primary hover:text-accent font-medium transition-colors"
