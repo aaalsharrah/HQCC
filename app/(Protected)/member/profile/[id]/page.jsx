@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, use } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -20,11 +20,17 @@ import {
   MoreHorizontal,
 } from 'lucide-react';
 
-
-// 🔥 adjust this path if your firebase file is elsewhere
 import { auth, db } from '@/app/lib/firebase/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import {
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  orderBy,
+  getDocs,
+} from 'firebase/firestore';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -44,7 +50,7 @@ export default function ProfilePage() {
       }
 
       try {
-        // ✅ always use the Firebase Auth UID
+        // Load profile from "members"
         const ref = doc(db, 'members', user.uid);
         const snap = await getDoc(ref);
 
@@ -88,27 +94,59 @@ export default function ProfilePage() {
             bio: data.bio || 'HQCC member | Quantum & Computing Enthusiast',
             location: data.location || 'Hempstead, NY',
             website: data.website || 'hqcc.hofstra.edu',
-            joined: 'September 2023', // later: format data.createdAt
+            joined: 'September 2023',
             following: data.following || 0,
             followers: data.followers || 0,
           });
         }
 
-        setPosts([
-          {
-            id: '1',
-            content:
-              'Welcome to your HQCC profile! Soon you will be able to customize your bio and posts.',
-            timestamp: 'just now',
-            likes: 0,
-            comments: 0,
-            shares: 0,
+        // Fetch this user's posts
+        const postsRef = collection(db, 'posts');
+        const q = query(
+          postsRef,
+          where('authorId', '==', user.uid),
+          orderBy('createdAt', 'desc')
+        );
+
+        const postsSnap = await getDocs(q);
+
+        const userPosts = postsSnap.docs.map((docSnap) => {
+          const data = docSnap.data();
+
+          return {
+            id: docSnap.id,
+            content: data.content || '',
+            timestamp: data.createdAt
+              ? data.createdAt.toDate().toLocaleString()
+              : 'Just now',
+            likes: data.likesCount ?? 0,
+            comments: data.commentsCount ?? 0,
+            shares: data.sharesCount ?? 0,
             isLiked: false,
             isBookmarked: false,
-          },
-        ]);
+            image: data.imageUrl || null,
+          };
+        });
+
+        if (userPosts.length > 0) {
+          setPosts(userPosts);
+        } else {
+          setPosts([
+            {
+              id: 'welcome',
+              content:
+                'Welcome to your HQCC profile! Start posting to see your content here.',
+              timestamp: 'just now',
+              likes: 0,
+              comments: 0,
+              shares: 0,
+              isLiked: false,
+              isBookmarked: false,
+            },
+          ]);
+        }
       } catch (err) {
-        console.error('Error loading profile:', err);
+        console.error('Error loading profile or posts:', err);
       } finally {
         setLoading(false);
       }
@@ -245,8 +283,6 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      
-
       <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
         <div className="absolute top-20 right-20 w-96 h-96 bg-primary/20 rounded-full blur-[120px] animate-float-gentle" />
         <div
@@ -268,7 +304,8 @@ export default function ProfilePage() {
             />
           </div>
 
-          <div className="relative px-6 pb-6">
+          {/* Add top padding here so content starts below avatar */}
+          <div className="relative px-6 pb-6 pt-20 md:pt-24">
             {/* Avatar */}
             <div className="absolute -top-16 md:-top-20">
               <Avatar className="h-32 w-32 md:h-40 md:w-40 ring-4 ring-card border-4 border-background">
@@ -280,7 +317,7 @@ export default function ProfilePage() {
             </div>
 
             {/* Edit Profile button */}
-            <div className="flex justify-end pt-4">
+            <div className="flex justify-end">
               <Link href="/member/settings">
                 <Button
                   className="
@@ -307,7 +344,7 @@ export default function ProfilePage() {
               </p>
 
               {/* Meta */}
-              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-4">
+              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-2">
                 {profile.location && (
                   <div className="flex items-center gap-1">
                     <MapPin className="h-4 w-4" />
@@ -336,23 +373,7 @@ export default function ProfilePage() {
                   <span>Joined {profile.joined}</span>
                 </div>
               </div>
-
-              {/* Stats */}
-              <div className="flex gap-6 text-sm">
-                <button className="hover:underline">
-                  <span className="font-bold text-foreground">
-                    {profile.following}
-                  </span>{' '}
-                  <span className="text-muted-foreground">Following</span>
-                </button>
-
-                <button className="hover:underline">
-                  <span className="font-bold text-foreground">
-                    {profile.followers}
-                  </span>{' '}
-                  <span className="text-muted-foreground">Followers</span>
-                </button>
-              </div>
+              {/* 👆 Following / Followers section removed */}
             </div>
           </div>
         </Card>
