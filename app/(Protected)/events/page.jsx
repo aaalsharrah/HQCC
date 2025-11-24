@@ -133,7 +133,7 @@ export default function EventsPage() {
         {/* Hero Section */}
         <section className="pt-32 pb-20 px-4">
           <div className="max-w-7xl mx-auto text-center">
-            <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+            <h1 className="text-5xl md:text-7xl font-bold mb-6 bg-linear-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
               HQCC Events
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
@@ -198,7 +198,7 @@ export default function EventsPage() {
                       height={192}
                       className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-card to-transparent" />
+                    <div className="absolute inset-0 bg-linear-to-t from-card to-transparent" />
                     <div className="absolute top-4 right-4">
                       <span className="px-3 py-1 bg-primary/90 backdrop-blur-sm text-primary-foreground text-sm font-medium rounded-full">
                         {event.category}

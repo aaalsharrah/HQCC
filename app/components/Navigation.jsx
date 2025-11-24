@@ -21,9 +21,6 @@ export function Navigation() {
     { label: 'About', href: '#about' },
     { label: 'Activities', href: '#activities' },
     { label: 'Team', href: '#team' },
-    { label: 'Event', href: '/events' },
-    { label: 'TimeLine', href: '/timeline' },
-    { label: 'community', href: '/community' },
   ];
 
   return (
@@ -36,16 +33,18 @@ export function Navigation() {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
+          {/* Logo */}
           <Link
             href="/"
             className="text-2xl font-bold tracking-tight transition-colors hover:text-primary"
           >
-            <span className="bg-linear-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
               HQCC
             </span>
           </Link>
 
-          <div className="hidden md:flex items-center gap-8">
+          {/* Desktop nav */}
+          <div className="hidden md:flex items-center gap-6">
             {navItems.map((item) => (
               <a
                 key={item.label}
@@ -56,14 +55,25 @@ export function Navigation() {
                 <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all group-hover:w-full" />
               </a>
             ))}
-            <Button
-              asChild
-              className="bg-primary hover:bg-primary/90 text-primary-foreground"
-            >
-              <a href="/signin">Sign In</a>
-            </Button>
+
+            {/* Desktop auth buttons */}
+            <div className="flex items-center gap-3">
+              <Button
+                asChild
+                className="bg-primary hover:bg-primary/90 text-primary-foreground text-sm"
+              >
+                <a href="/signin">Sign In</a>
+              </Button>
+              <Button
+                asChild
+                className="bg-primary hover:bg-primary/90 text-primary-foreground text-sm"
+              >
+                <a href="/signup">Sign Up</a>
+              </Button>
+            </div>
           </div>
 
+          {/* Mobile menu button */}
           <div className="md:hidden">
             <Button
               variant="ghost"
@@ -81,6 +91,7 @@ export function Navigation() {
         </div>
       </div>
 
+      {/* Mobile dropdown */}
       {isOpen && (
         <div className="md:hidden bg-card/95 backdrop-blur-xl border-t border-border">
           <div className="px-4 pt-2 pb-4 space-y-1">
@@ -94,12 +105,17 @@ export function Navigation() {
                 {item.label}
               </a>
             ))}
-            <div className="px-3 pt-2">
+
+            {/* Mobile auth buttons (stacked) */}
+            <div className="px-3 pt-3 space-y-2">
               <Button
                 asChild
                 className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
               >
                 <a href="/signin">Sign In</a>
+              </Button>
+              <Button asChild variant="outline" className="w-full">
+                <a href="/signup">Sign Up</a>
               </Button>
             </div>
           </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, use } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -85,7 +85,8 @@ const mockPosts = [
 const mockMediaPosts = mockPosts.filter((p) => p.image);
 const mockLikedPosts = mockPosts.filter((p) => p.isLiked);
 
-export default function ProfilePage({ params }) {
+export default function ProfilePage(props) {
+  const params = use(props.params);
   const { username } = params;
   const [profile] = useState(mockProfile);
   const [posts, setPosts] = useState(mockPosts);
@@ -150,6 +151,8 @@ export default function ProfilePage({ params }) {
             src={post.image || '/placeholder.svg'}
             alt="Post content"
             className="w-full h-auto"
+            width={196}
+            height={10}
           />
         </div>
       )}
@@ -221,10 +224,12 @@ export default function ProfilePage({ params }) {
         {/* Profile header */}
         <Card className="overflow-hidden bg-card/50 backdrop-blur-xl border-border/50 mb-6">
           <div className="relative h-48 md:h-64 bg-gradient-to-r from-primary/20 via-accent/20 to-secondary/20">
-            <img
+            <Image
               src={profile.coverImage || '/placeholder.svg'}
               alt="Cover"
               className="w-full h-full object-cover opacity-50"
+              width={196}
+              height={10}
             />
           </div>
 

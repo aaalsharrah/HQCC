@@ -1,127 +1,181 @@
-'use client'
+"use client";
 
-import { useState, useEffect } from 'react'
-import { Bell, Heart, MessageCircle, Calendar, Megaphone, Mail, Menu } from "lucide-react"
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
-import { cn } from '@/lib/utils'
-import { AppSidebarContent } from '@/components/app-sidebar'
-import { Button } from '@/components/ui/button'
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
-import { useAuth } from '@/lib/firebase/auth-context'
-import { getNotifications } from '@/lib/firebase/notifications'
-import { Loader2 } from 'lucide-react'
+import { useState } from "react";
+
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Settings, CheckCheck } from "lucide-react";
+
+// IMPORT DATA + ICONS
+import {
+  notificationsData,
+  getNotificationIcon,
+} from "./data";
+import { Navigation } from "@/app/components/Navigation";
 
 export default function NotificationsPage() {
-  const { user, loading: authLoading } = useAuth()
-  const [notifications, setNotifications] = useState([])
-  const [isLoading, setIsLoading] = useState(true)
+  const [filter, setFilter] = useState("all");
+  const [notifications, setNotifications] = useState(notificationsData);
 
-  useEffect(() => {
-    if (authLoading || !user) return
+  const markAllAsRead = () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+  };
 
-    const loadNotifications = async () => {
-      setIsLoading(true)
-      try {
-        const notifs = await getNotifications(user.uid)
-        setNotifications(notifs)
-      } catch (error) {
-        console.error('Error loading notifications:', error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
+  const filteredNotifications = notifications.filter((n) => {
+    if (filter === "all") return true;
+    if (filter === "mentions") return n.type === "mention";
+    if (filter === "likes") return n.type === "like";
+    if (filter === "follows") return n.type === "follow";
+    return true;
+  });
 
-    loadNotifications()
-  }, [authLoading, user])
-
-  const getIcon = (type) => {
-    switch (type) {
-      case "like":
-        return <Heart className="w-5 h-5 text-red-500 fill-current" />
-      case "reply":
-        return <MessageCircle className="w-5 h-5 text-blue-500 fill-current" />
-      case "event":
-        return <Calendar className="w-5 h-5 text-purple-500" />
-      case "announcement":
-        return <Megaphone className="w-5 h-5 text-yellow-500" />
-      case "dm":
-        return <Mail className="w-5 h-5 text-green-500" />
-      default:
-        return <Bell className="w-5 h-5 text-primary" />
-    }
-  }
-
-  if (authLoading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    )
-  }
+  const unreadCount = notifications.filter((n) => !n.read).length;
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex">
-      {/* Desktop Sidebar */}
-      <div className="hidden md:block fixed inset-y-0 left-0 w-64 border-r border-border bg-background/50 backdrop-blur-xl z-30">
-        <AppSidebarContent />
-      </div>
+    <div className="min-h-screen bg-background">
+      <Navigation />
 
-      <div className="flex-1 md:ml-64 w-full">
-        <header className="sticky top-0 z-10 border-b border-border bg-background/80 backdrop-blur-md p-4 flex items-center gap-4">
-          <Sheet>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden">
-                <Menu className="w-5 h-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-[300px] sm:w-[400px] p-0">
-              <AppSidebarContent />
-            </SheetContent>
-          </Sheet>
-          <h1 className="text-xl font-bold">Notifications</h1>
-        </header>
+      <main className="pt-24 pb-16">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* HEADER */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+                  Notifications
+                </h1>
 
-        <main className="divide-y divide-border">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                {unreadCount > 0 && (
+                  <p className="text-muted-foreground">
+                    You have {unreadCount} unread notifications
+                  </p>
+                )}
+              </div>
+
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={markAllAsRead}
+                  disabled={unreadCount === 0}
+                >
+                  <CheckCheck className="h-4 w-4 mr-2" />
+                  Mark all read
+                </Button>
+
+                <Button variant="outline" size="sm" asChild>
+                  <a href="/settings">
+                    <Settings className="h-4 w-4" />
+                  </a>
+                </Button>
+              </div>
             </div>
-          ) : notifications.length === 0 ? (
-            <div className="p-8 text-center text-muted-foreground">No notifications yet</div>
-          ) : (
-            notifications.map((notification) => (
+
+            {/* FILTER TABS */}
+            <div className="flex gap-2 p-1 bg-card/50 backdrop-blur-xl rounded-lg border border-border">
+              {[
+                { label: "All", value: "all" },
+                { label: "Mentions", value: "mentions" },
+                { label: "Likes", value: "likes" },
+                { label: "Follows", value: "follows" },
+              ].map((tab) => (
+                <button
+                  key={tab.value}
+                  onClick={() => setFilter(tab.value)}
+                  className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                    filter === tab.value
+                      ? "bg-primary text-primary-foreground shadow-lg"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* NOTIFICATION LIST */}
+          <div className="space-y-2">
+            {filteredNotifications.map((notification) => (
               <div
                 key={notification.id}
-                className={cn(
-                  "flex items-start gap-4 p-4 hover:bg-muted/50 transition-colors cursor-pointer",
-                  !notification.read && "bg-muted/20",
-                )}
+                className={`group relative bg-card/50 backdrop-blur-xl rounded-xl p-5 border transition-all hover:bg-card/70 hover:shadow-lg hover:scale-[1.01] ${
+                  notification.read
+                    ? "border-border"
+                    : "border-primary/30 bg-primary/5"
+                }`}
               >
-                <div className="mt-1">{getIcon(notification.type)}</div>
-                <div className="flex-1 space-y-1">
-                  {notification.user && (
-                    <div className="mb-1">
-                      <Avatar className="w-8 h-8">
-                        <AvatarImage src={notification.user.avatar || "/placeholder.svg"} alt={notification.user.name || notification.user.email} />
-                        <AvatarFallback>{(notification.user.name || notification.user.email?.[0] || 'U').toUpperCase()}</AvatarFallback>
+                <div className="flex gap-4">
+                  {/* ICON */}
+                  <div className="flex-shrink-0 mt-1">
+                    {getNotificationIcon(notification.type)}
+                  </div>
+
+                  {/* CONTENT */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start gap-3">
+                      <Avatar className="h-10 w-10 border-2 border-primary/20">
+                        <AvatarImage
+                          src={notification.user.avatar || "/placeholder.svg"}
+                          alt={notification.user.name}
+                        />
+                        <AvatarFallback>
+                          {notification.user.name[0]}
+                        </AvatarFallback>
                       </Avatar>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-semibold text-foreground hover:text-primary transition-colors cursor-pointer">
+                            {notification.user.name}
+                          </span>
+
+                          <span className="text-muted-foreground text-sm">
+                            {notification.content}
+                          </span>
+
+                          <span className="text-muted-foreground/60 text-xs ml-auto">
+                            {notification.timestamp}
+                          </span>
+                        </div>
+
+                        {notification.postPreview && (
+                          <div className="mt-2 p-3 bg-muted/30 rounded-lg border border-border/50">
+                            <p className="text-sm text-foreground/80 line-clamp-2">
+                              {notification.postPreview}
+                            </p>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
-                  <p className="text-sm">
-                    {notification.user && <span className="font-bold mr-1">{notification.user.name || notification.user.email?.split('@')[0]}</span>}
-                    <span className="text-muted-foreground">{notification.content}</span>
-                  </p>
-                  {notification.timestamp && (
-                    <p className="text-xs text-muted-foreground">
-                      {notification.timestamp.toDate ? new Date(notification.timestamp.toDate()).toLocaleString() : notification.timestamp}
-                    </p>
+                  </div>
+
+                  {/* UNREAD DOT */}
+                  {!notification.read && (
+                    <div className="flex-shrink-0">
+                      <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                    </div>
                   )}
                 </div>
               </div>
-            ))
+            ))}
+          </div>
+
+          {/* EMPTY STATE */}
+          {filteredNotifications.length === 0 && (
+            <div className="text-center py-16">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-muted/50 mb-4">
+                <CheckCheck className="h-8 w-8 text-muted-foreground" />
+              </div>
+
+              <h3 className="text-xl font-semibold mb-2">No notifications</h3>
+              <p className="text-muted-foreground">
+                You are all caught up!
+              </p>
+            </div>
           )}
-        </main>
-      </div>
+        </div>
+      </main>
     </div>
-  )
+  );
 }
