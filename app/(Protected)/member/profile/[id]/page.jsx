@@ -19,7 +19,7 @@ import {
   LinkIcon,
   MoreHorizontal,
 } from 'lucide-react';
-import { Navigation } from '@/app/components/Navigation';
+
 
 // 🔥 adjust this path if your firebase file is elsewhere
 import { auth, db } from '@/app/lib/firebase/firebase';
@@ -245,7 +245,7 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
+      
 
       <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
         <div className="absolute top-20 right-20 w-96 h-96 bg-primary/20 rounded-full blur-[120px] animate-float-gentle" />

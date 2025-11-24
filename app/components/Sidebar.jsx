@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 import {
   Home,
@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { auth } from '@/app/lib/firebase/firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 
 const navItems = [
   { label: 'Home', href: '/', icon: Home },
@@ -24,29 +26,55 @@ const navItems = [
   { label: 'Events', href: '/member/events', icon: User },
   { label: 'Messages', href: '/member/messages', icon: MessageCircle },
   { label: 'Notifications', href: '/member/notifications', icon: Bell },
-
-  { label: 'Profile', href: '/member/profile/test', icon: User },
+  { label: 'Profile', href: '/member/profile/test', icon: User }, // later: swap 'test'
   { label: 'Settings', href: '/member/settings', icon: User },
 ];
 
-export default function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+export default function Sidebar({ collapsed, onToggle }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [currentUser, setCurrentUser] = useState(null);
 
-  const handleLogout = () => {
-    console.log('Logging out…');
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user || null);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.push('/signin');
+    } catch (err) {
+      console.error('Error logging out:', err);
+    }
   };
+
+  const displayName =
+    currentUser?.displayName ||
+    currentUser?.email?.split('@')[0] ||
+    'Member';
+
+  const username =
+    currentUser?.email
+      ?.split('@')[0]
+      ?.toLowerCase()
+      .replace(/[^a-z0-9]/g, '') || 'member';
+
+  const avatarUrl =
+    currentUser?.photoURL || '/quantum-computing-student.jpg';
 
   return (
     <aside
       className={`
-      fixed top-16 left-0 z-30
-      h-[calc(100vh-4rem)] border-r border-border 
-      bg-card/80 backdrop-blur-xl 
-      transition-all duration-300
-      ${collapsed ? 'w-20' : 'w-64'}
-      hidden md:flex flex-col
-    `}
+        fixed top-0 left-0 z-30
+        h-screen border-r border-border 
+        bg-card/80 backdrop-blur-xl 
+        transition-all duration-300
+        ${collapsed ? 'w-20' : 'w-64'}
+        hidden md:flex flex-col
+      `}
     >
       {/* TOP */}
       <div className="flex items-center justify-between px-4 py-4 border-b border-border">
@@ -56,8 +84,9 @@ export default function Sidebar() {
           </span>
         )}
         <button
-          onClick={() => setCollapsed((prev) => !prev)}
+          onClick={onToggle}
           className="p-1 rounded-full border border-border/60 hover:bg-muted/60 transition-colors"
+          type="button"
         >
           {collapsed ? (
             <ChevronRight className="h-4 w-4" />
@@ -102,15 +131,19 @@ export default function Sidebar() {
           }`}
         >
           <Avatar className="h-10 w-10 border border-primary/20">
-            <AvatarImage src="/quantum-computing-student.jpg" />
-            <AvatarFallback>U</AvatarFallback>
+            <AvatarImage src={avatarUrl} />
+            <AvatarFallback>
+              {displayName.slice(0, 1).toUpperCase()}
+            </AvatarFallback>
           </Avatar>
 
           {!collapsed && (
             <div className="min-w-0">
-              <p className="text-sm font-semibold truncate">Your Name</p>
+              <p className="text-sm font-semibold truncate">
+                {displayName}
+              </p>
               <p className="text-xs text-muted-foreground truncate">
-                @username
+                @{username}
               </p>
             </div>
           )}
@@ -118,6 +151,7 @@ export default function Sidebar() {
 
         <button
           onClick={handleLogout}
+          type="button"
           className={`flex w-full items-center ${
             collapsed ? 'justify-center' : 'justify-start'
           } gap-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors`}

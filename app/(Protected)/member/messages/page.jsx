@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 
 import { Search, Send } from 'lucide-react';
 import { conversations } from './data';
-import { Navigation } from '@/app/components/Navigation';
+
 import Image from 'next/image';
 
 export default function MessagesPage() {
@@ -21,8 +21,6 @@ export default function MessagesPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
-
       <div className="pt-20 h-screen flex">
         {/* Conversations Sidebar */}
         <div className="w-full md:w-96 border-r border-border flex flex-col bg-card/30 backdrop-blur-sm">
@@ -47,7 +45,7 @@ export default function MessagesPage() {
             {filteredConversations.map((conv) => (
               <button
                 key={conv.id}
-                onClick={() => router.push(`/messages/${conv.id}`)}
+                onClick={() => router.push(`/member/messages/${conv.id}`)}
                 className="w-full p-4 flex items-start gap-3 hover:bg-primary/5 transition-colors border-b border-border/50"
               >
                 <div className="relative">

@@ -1,20 +1,16 @@
-"use client";
+'use client';
 
-import { useState } from "react";
+import { useState } from 'react';
 
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Settings, CheckCheck } from "lucide-react";
+import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Settings, CheckCheck } from 'lucide-react';
 
 // IMPORT DATA + ICONS
-import {
-  notificationsData,
-  getNotificationIcon,
-} from "./data";
-import { Navigation } from "@/app/components/Navigation";
+import { notificationsData, getNotificationIcon } from './data';
 
 export default function NotificationsPage() {
-  const [filter, setFilter] = useState("all");
+  const [filter, setFilter] = useState('all');
   const [notifications, setNotifications] = useState(notificationsData);
 
   const markAllAsRead = () => {
@@ -22,10 +18,10 @@ export default function NotificationsPage() {
   };
 
   const filteredNotifications = notifications.filter((n) => {
-    if (filter === "all") return true;
-    if (filter === "mentions") return n.type === "mention";
-    if (filter === "likes") return n.type === "like";
-    if (filter === "follows") return n.type === "follow";
+    if (filter === 'all') return true;
+    if (filter === 'mentions') return n.type === 'mention';
+    if (filter === 'likes') return n.type === 'like';
+    if (filter === 'follows') return n.type === 'follow';
     return true;
   });
 
@@ -33,8 +29,6 @@ export default function NotificationsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
-
       <main className="pt-24 pb-16">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* HEADER */}
@@ -74,18 +68,18 @@ export default function NotificationsPage() {
             {/* FILTER TABS */}
             <div className="flex gap-2 p-1 bg-card/50 backdrop-blur-xl rounded-lg border border-border">
               {[
-                { label: "All", value: "all" },
-                { label: "Mentions", value: "mentions" },
-                { label: "Likes", value: "likes" },
-                { label: "Follows", value: "follows" },
+                { label: 'All', value: 'all' },
+                { label: 'Mentions', value: 'mentions' },
+                { label: 'Likes', value: 'likes' },
+                { label: 'Follows', value: 'follows' },
               ].map((tab) => (
                 <button
                   key={tab.value}
                   onClick={() => setFilter(tab.value)}
                   className={`flex-1 px-4 py-2 rounded-md text-sm font-medium transition-all ${
                     filter === tab.value
-                      ? "bg-primary text-primary-foreground shadow-lg"
-                      : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                      ? 'bg-primary text-primary-foreground shadow-lg'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
                   }`}
                 >
                   {tab.label}
@@ -101,8 +95,8 @@ export default function NotificationsPage() {
                 key={notification.id}
                 className={`group relative bg-card/50 backdrop-blur-xl rounded-xl p-5 border transition-all hover:bg-card/70 hover:shadow-lg hover:scale-[1.01] ${
                   notification.read
-                    ? "border-border"
-                    : "border-primary/30 bg-primary/5"
+                    ? 'border-border'
+                    : 'border-primary/30 bg-primary/5'
                 }`}
               >
                 <div className="flex gap-4">
@@ -116,7 +110,7 @@ export default function NotificationsPage() {
                     <div className="flex items-start gap-3">
                       <Avatar className="h-10 w-10 border-2 border-primary/20">
                         <AvatarImage
-                          src={notification.user.avatar || "/placeholder.svg"}
+                          src={notification.user.avatar || '/placeholder.svg'}
                           alt={notification.user.name}
                         />
                         <AvatarFallback>
@@ -169,9 +163,7 @@ export default function NotificationsPage() {
               </div>
 
               <h3 className="text-xl font-semibold mb-2">No notifications</h3>
-              <p className="text-muted-foreground">
-                You are all caught up!
-              </p>
+              <p className="text-muted-foreground">You are all caught up!</p>
             </div>
           )}
         </div>

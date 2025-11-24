@@ -23,7 +23,7 @@ import {
   Save,
   Trash2,
 } from 'lucide-react';
-import { Navigation } from '@/app/components/Navigation';
+
 
 // 🔥 Firebase imports
 import { auth, db } from '@/app/lib/firebase/firebase';
@@ -302,7 +302,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
+      
 
       {/* Background effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">

@@ -1,15 +1,7 @@
-// app/(protected)/layout.jsx (example)
+// app/(protected)/layout.jsx
 'use client';
 
-import Sidebar from '../components/Sidebar';
-
 export default function ProtectedLayout({ children }) {
-  return (
-    <div className="min-h-screen bg-background">
-      <div className="pt-16 flex">
-        <Sidebar />
-        <main className="flex-1 min-h-screen overflow-y-auto">{children}</main>
-      </div>
-    </div>
-  );
+  // Sidebar & Navbar are handled globally by AppShell
+  return <div className="min-h-screen bg-background">{children}</div>;
 }

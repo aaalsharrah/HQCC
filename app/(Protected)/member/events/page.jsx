@@ -1,6 +1,5 @@
 'use client';
 
-import { Navigation } from '@/app/components/Navigation';
 import { Button } from '@/components/ui/button';
 import { Calendar, Clock, MapPin, Users, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
@@ -120,8 +119,6 @@ export default function EventsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navigation />
-
       <div className="relative overflow-hidden">
         {/* Animated Background */}
         <div className="fixed inset-0 -z-10">

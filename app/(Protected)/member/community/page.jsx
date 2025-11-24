@@ -14,7 +14,6 @@ import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
-import { Navigation } from '@/app/components/Navigation';
 
 const members = [
   {
@@ -117,8 +116,6 @@ const stats = [
 export default function CommunityPage() {
   return (
     <div className="relative min-h-screen bg-background">
-      <Navigation />
-
       {/* Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 -left-48 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-pulse" />
