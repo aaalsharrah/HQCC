@@ -230,59 +230,62 @@ export default function FeedPage() {
                 </p>
 
                 {/* Post actions */}
+                {/* Post actions */}
                 <div className="flex items-center justify-between pt-4 border-t border-border/50">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleLike(post.id)}
-                    className={`gap-2 ${
-                      post.isLiked
-                        ? 'text-red-500 hover:text-red-600'
-                        : 'text-muted-foreground hover:text-red-500'
-                    }`}
-                  >
-                    <Heart
-                      className={`h-5 w-5 ${
-                        post.isLiked ? 'fill-current' : ''
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleLike(post.id)}
+                      className={`gap-2 ${
+                        post.isLiked
+                          ? 'text-red-500 hover:text-red-600'
+                          : 'text-muted-foreground hover:text-red-500'
                       }`}
-                    />
-                    <span className="text-sm">{post.likesCount ?? 0}</span>
-                  </Button>
+                    >
+                      <Heart
+                        className={`h-5 w-5 ${
+                          post.isLiked ? 'fill-current' : ''
+                        }`}
+                      />
+                      <span className="text-sm">{post.likesCount ?? 0}</span>
+                    </Button>
 
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="gap-2 text-muted-foreground hover:text-primary"
-                  >
-                    <MessageCircle className="h-5 w-5" />
-                    <span className="text-sm">0</span>
-                  </Button>
+                    <Link
+                      href={`/member/post/${post.id}`}
+                      className="text-sm text-muted-foreground hover:text-primary hover:underline flex items-center gap-1"
+                    >
+                      <MessageCircle className="h-4 w-4" />
+                      View thread & reply
+                    </Link>
+                  </div>
 
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="gap-2 text-muted-foreground hover:text-primary"
-                  >
-                    <Share2 className="h-5 w-5" />
-                    <span className="text-sm">0</span>
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-2 text-muted-foreground hover:text-primary"
+                    >
+                      <Share2 className="h-5 w-5" />
+                    </Button>
 
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleBookmark(post.id)}
-                    className={`${
-                      post.isBookmarked
-                        ? 'text-accent hover:text-accent/80'
-                        : 'text-muted-foreground hover:text-accent'
-                    }`}
-                  >
-                    <Bookmark
-                      className={`h-5 w-5 ${
-                        post.isBookmarked ? 'fill-current' : ''
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleBookmark(post.id)}
+                      className={`${
+                        post.isBookmarked
+                          ? 'text-accent hover:text-accent/80'
+                          : 'text-muted-foreground hover:text-accent'
                       }`}
-                    />
-                  </Button>
+                    >
+                      <Bookmark
+                        className={`h-5 w-5 ${
+                          post.isBookmarked ? 'fill-current' : ''
+                        }`}
+                      />
+                    </Button>
+                  </div>
                 </div>
               </Card>
             ))}
