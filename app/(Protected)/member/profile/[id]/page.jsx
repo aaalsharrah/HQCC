@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -20,7 +19,7 @@ import {
   MoreHorizontal,
 } from 'lucide-react';
 
-import { auth, db } from '@/app/lib/firebase/firebase';
+import { auth, db, storage } from '@/app/lib/firebase/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   doc,
@@ -30,7 +29,9 @@ import {
   where,
   orderBy,
   getDocs,
+  setDoc,
 } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -38,6 +39,17 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  const [isEditing, setIsEditing] = useState(false);
+  const [editData, setEditData] = useState({
+    name: '',
+    username: '',
+    bio: '',
+    location: '',
+    website: '',
+  });
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [saving, setSaving] = useState(false);
 
   const mediaPosts = posts.filter((p) => p.image);
   const likedPosts = posts.filter((p) => p.isLiked);
@@ -51,8 +63,10 @@ export default function ProfilePage() {
 
       try {
         // Load profile from "members"
-        const ref = doc(db, 'members', user.uid);
-        const snap = await getDoc(ref);
+        const refDoc = doc(db, 'members', user.uid);
+        const snap = await getDoc(refDoc);
+
+        let loadedProfile;
 
         if (!snap.exists()) {
           const fallbackName =
@@ -63,7 +77,7 @@ export default function ProfilePage() {
               ?.toLowerCase()
               .replace(/[^a-z0-9]/g, '') || 'member';
 
-          setProfile({
+          loadedProfile = {
             uid: user.uid,
             name: fallbackName,
             username,
@@ -75,13 +89,28 @@ export default function ProfilePage() {
             location: 'Hempstead, NY',
             website: 'hqcc.hofstra.edu',
             joined: 'September 2023',
-            following: 0,
-            followers: 0,
-          });
+          };
+
+          // create initial member doc
+          await setDoc(
+            refDoc,
+            {
+              name: loadedProfile.name,
+              username: loadedProfile.username,
+              email: loadedProfile.email,
+              avatar: loadedProfile.avatar,
+              coverImage: loadedProfile.coverImage,
+              bio: loadedProfile.bio,
+              location: loadedProfile.location,
+              website: loadedProfile.website,
+              createdAt: new Date(),
+            },
+            { merge: true }
+          );
         } else {
           const data = snap.data();
 
-          setProfile({
+          loadedProfile = {
             uid: user.uid,
             name: data.name || 'HQCC Member',
             username: data.username || 'member',
@@ -94,11 +123,20 @@ export default function ProfilePage() {
             bio: data.bio || 'HQCC member | Quantum & Computing Enthusiast',
             location: data.location || 'Hempstead, NY',
             website: data.website || 'hqcc.hofstra.edu',
-            joined: 'September 2023',
-            following: data.following || 0,
-            followers: data.followers || 0,
-          });
+            joined: 'September 2023', // later: format data.createdAt
+          };
         }
+
+        setProfile(loadedProfile);
+
+        // Initialize edit form from loaded profile
+        setEditData({
+          name: loadedProfile.name || '',
+          username: loadedProfile.username || '',
+          bio: loadedProfile.bio || '',
+          location: loadedProfile.location || '',
+          website: loadedProfile.website || '',
+        });
 
         // Fetch this user's posts
         const postsRef = collection(db, 'posts');
@@ -177,6 +215,64 @@ export default function ProfilePage() {
           : post
       )
     );
+  };
+
+  // Save profile changes (text fields + optional avatar upload)
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    if (!profile) return;
+
+    try {
+      setSaving(true);
+
+      let avatarUrl = profile.avatar;
+
+      if (avatarFile) {
+        const avatarRef = ref(storage, `avatars/${profile.uid}`);
+        await uploadBytes(avatarRef, avatarFile);
+        avatarUrl = await getDownloadURL(avatarRef);
+      }
+
+      const refDoc = doc(db, 'members', profile.uid);
+
+      await setDoc(
+        refDoc,
+        {
+          name: editData.name.trim() || profile.name,
+          username:
+            editData.username.trim() ||
+            profile.username ||
+            profile.email.split('@')[0],
+          bio: editData.bio.trim(),
+          location: editData.location.trim(),
+          website: editData.website.trim(),
+          avatar: avatarUrl,
+        },
+        { merge: true }
+      );
+
+      // Update local state
+      setProfile((prev) => ({
+        ...prev,
+        name: editData.name.trim() || prev.name,
+        username:
+          editData.username.trim() ||
+          prev.username ||
+          prev.email.split('@')[0],
+        bio: editData.bio.trim(),
+        location: editData.location.trim(),
+        website: editData.website.trim(),
+        avatar: avatarUrl,
+      }));
+
+      setIsEditing(false);
+      setAvatarFile(null);
+    } catch (err) {
+      console.error('Error saving profile:', err);
+      alert('Failed to save profile. Please try again.');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const PostCard = ({ post, postsArray, setPostsArray }) => (
@@ -304,7 +400,7 @@ export default function ProfilePage() {
             />
           </div>
 
-          {/* Add top padding here so content starts below avatar */}
+          {/* Add top padding so content starts below avatar */}
           <div className="relative px-6 pb-6 pt-20 md:pt-24">
             {/* Avatar */}
             <div className="absolute -top-16 md:-top-20">
@@ -316,65 +412,222 @@ export default function ProfilePage() {
               </Avatar>
             </div>
 
-            {/* Edit Profile button */}
+            {/* Edit Profile toggle */}
             <div className="flex justify-end">
-              <Link href="/member/settings">
-                <Button
-                  className="
-                    bg-gradient-to-r from-primary via-accent to-secondary
-                    text-white font-medium
-                    hover:opacity-90
-                    transition-all
-                  "
-                >
-                  Edit Profile
-                </Button>
-              </Link>
+              <Button
+                onClick={() => setIsEditing((prev) => !prev)}
+                className="
+                  bg-gradient-to-r from-primary via-accent to-secondary
+                  text-white font-medium
+                  hover:opacity-90
+                  transition-all
+                "
+              >
+                {isEditing ? 'Cancel' : 'Edit Profile'}
+              </Button>
             </div>
 
-            {/* Profile Info */}
-            <div className="mt-4">
-              <h1 className="text-3xl font-bold text-foreground mb-1">
-                {profile.name}
-              </h1>
-              <p className="text-muted-foreground mb-4">@{profile.username}</p>
+            {/* Profile Info / Edit Form */}
+            {!isEditing ? (
+              <div className="mt-4">
+                <h1 className="text-3xl font-bold text-foreground mb-1">
+                  {profile.name}
+                </h1>
+                <p className="text-muted-foreground mb-4">@{profile.username}</p>
 
-              <p className="text-foreground leading-relaxed mb-4">
-                {profile.bio}
-              </p>
+                <p className="text-foreground leading-relaxed mb-4">
+                  {profile.bio}
+                </p>
 
-              {/* Meta */}
-              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-2">
-                {profile.location && (
+                {/* Meta */}
+                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-2">
+                  {profile.location && (
+                    <div className="flex items-center gap-1">
+                      <MapPin className="h-4 w-4" />
+                      <span>{profile.location}</span>
+                    </div>
+                  )}
+
+                  {profile.website && (
+                    <a
+                      href={
+                        profile.website.startsWith('http')
+                          ? profile.website
+                          : `https://${profile.website}`
+                      }
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1 hover:text-primary transition-colors"
+                    >
+                      <LinkIcon className="h-4 w-4" />
+                      <span>{profile.website}</span>
+                    </a>
+                  )}
+
                   <div className="flex items-center gap-1">
-                    <MapPin className="h-4 w-4" />
-                    <span>{profile.location}</span>
+                    <Calendar className="h-4 w-4" />
+                    <span>Joined {profile.joined}</span>
                   </div>
-                )}
-
-                {profile.website && (
-                  <a
-                    href={
-                      profile.website.startsWith('http')
-                        ? profile.website
-                        : `https://${profile.website}`
-                    }
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1 hover:text-primary transition-colors"
-                  >
-                    <LinkIcon className="h-4 w-4" />
-                    <span>{profile.website}</span>
-                  </a>
-                )}
-
-                <div className="flex items-center gap-1">
-                  <Calendar className="h-4 w-4" />
-                  <span>Joined {profile.joined}</span>
                 </div>
               </div>
-              {/* 👆 Following / Followers section removed */}
-            </div>
+            ) : (
+              <form onSubmit={handleSaveProfile} className="mt-4 space-y-4">
+                {/* Avatar upload */}
+                <div className="flex items-center gap-4">
+                  <Avatar className="h-20 w-20 ring-2 ring-primary/40">
+                    <AvatarImage src={profile.avatar || '/placeholder.svg'} />
+                    <AvatarFallback>
+                      {profile.name ? profile.name.slice(0, 2) : 'HQ'}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-1">
+                      Profile picture
+                    </p>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) =>
+                        setAvatarFile(e.target.files?.[0] || null)
+                      }
+                      className="text-sm text-muted-foreground"
+                    />
+                    {avatarFile && (
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Selected: {avatarFile.name}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Name & username */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Name
+                    </label>
+                    <input
+                      type="text"
+                      value={editData.name}
+                      onChange={(e) =>
+                        setEditData((prev) => ({
+                          ...prev,
+                          name: e.target.value,
+                        }))
+                      }
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Username
+                    </label>
+                    <div className="flex items-center rounded-md border border-border bg-background px-3 py-2 text-sm">
+                      <span className="text-muted-foreground mr-1">@</span>
+                      <input
+                        type="text"
+                        value={editData.username}
+                        onChange={(e) =>
+                          setEditData((prev) => ({
+                            ...prev,
+                            username: e.target.value.toLowerCase(),
+                          }))
+                        }
+                        className="flex-1 bg-transparent outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bio */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Bio
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={editData.bio}
+                    onChange={(e) =>
+                      setEditData((prev) => ({
+                        ...prev,
+                        bio: e.target.value,
+                      }))
+                    }
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm resize-none"
+                  />
+                </div>
+
+                {/* Location & Website */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Location
+                    </label>
+                    <input
+                      type="text"
+                      value={editData.location}
+                      onChange={(e) =>
+                        setEditData((prev) => ({
+                          ...prev,
+                          location: e.target.value,
+                        }))
+                      }
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium mb-1">
+                      Website
+                    </label>
+                    <input
+                      type="text"
+                      value={editData.website}
+                      onChange={(e) =>
+                        setEditData((prev) => ({
+                          ...prev,
+                          website: e.target.value,
+                        }))
+                      }
+                      placeholder="hqcc.hofstra.edu"
+                      className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setIsEditing(false);
+                      setAvatarFile(null);
+                      // reset form to current profile values
+                      setEditData({
+                        name: profile.name || '',
+                        username: profile.username || '',
+                        bio: profile.bio || '',
+                        location: profile.location || '',
+                        website: profile.website || '',
+                      });
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={saving}
+                    className="
+                      bg-gradient-to-r from-primary via-accent to-secondary
+                      text-white font-medium
+                      hover:opacity-90
+                      transition-all
+                    "
+                  >
+                    {saving ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                </div>
+              </form>
+            )}
           </div>
         </Card>
 
