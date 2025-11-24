@@ -101,7 +101,7 @@ export default function SettingsPage() {
           const defaultData = {
             uid: user.uid,
             name: fallbackName,
-            username: profile.username, // ✅ this is the key
+            username, // ✅ this is the key
             email: user.email,
             bio: 'HQCC member | Quantum & Computing Enthusiast',
             location: 'Hempstead, NY',

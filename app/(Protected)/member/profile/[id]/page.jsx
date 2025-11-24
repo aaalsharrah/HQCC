@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -26,9 +26,8 @@ import { auth, db } from '@/app/lib/firebase/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 
-export default function ProfilePage({ params }) {
+export default function ProfilePage() {
   const router = useRouter();
-  const { id } = params || {}; // uid from URL: /member/profile/[id]
 
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
@@ -38,8 +37,6 @@ export default function ProfilePage({ params }) {
   const likedPosts = posts.filter((p) => p.isLiked);
 
   useEffect(() => {
-    if (!id) return;
-
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         router.push('/signin');
@@ -47,11 +44,11 @@ export default function ProfilePage({ params }) {
       }
 
       try {
-        const ref = doc(db, 'members', id);
+        // ✅ always use the Firebase Auth UID
+        const ref = doc(db, 'members', user.uid);
         const snap = await getDoc(ref);
 
         if (!snap.exists()) {
-          // Fallback profile if doc missing
           const fallbackName =
             user.displayName || user.email?.split('@')[0] || 'HQCC Member';
           const username =
@@ -63,8 +60,8 @@ export default function ProfilePage({ params }) {
           setProfile({
             uid: user.uid,
             name: fallbackName,
-            email: user.email,
             username,
+            email: user.email,
             avatar: user.photoURL || '/quantum-computing-student.jpg',
             coverImage:
               '/quantum-computing-chip-with-glowing-circuits-and-b.jpg',
@@ -79,19 +76,16 @@ export default function ProfilePage({ params }) {
           const data = snap.data();
 
           setProfile({
-            uid: id,
+            uid: user.uid,
             name: data.name || 'HQCC Member',
-            username: data.username || 'member', // 🔥 pulled from Firestore
+            username: data.username || 'member',
             email: data.email || user.email || '',
             avatar:
-              data.avatar ||
-              user.photoURL ||
-              '/quantum-computing-student.jpg',
+              data.avatar || user.photoURL || '/quantum-computing-student.jpg',
             coverImage:
               data.coverImage ||
               '/quantum-computing-chip-with-glowing-circuits-and-b.jpg',
-            bio:
-              data.bio || 'HQCC member | Quantum & Computing Enthusiast',
+            bio: data.bio || 'HQCC member | Quantum & Computing Enthusiast',
             location: data.location || 'Hempstead, NY',
             website: data.website || 'hqcc.hofstra.edu',
             joined: 'September 2023', // later: format data.createdAt
@@ -100,7 +94,6 @@ export default function ProfilePage({ params }) {
           });
         }
 
-        // Seed a simple welcome post for now
         setPosts([
           {
             id: '1',
@@ -122,7 +115,7 @@ export default function ProfilePage({ params }) {
     });
 
     return () => unsub();
-  }, [id, router]);
+  }, [router]);
 
   const handleLike = (postId, postsArray, setPostsArray) => {
     setPostsArray(
