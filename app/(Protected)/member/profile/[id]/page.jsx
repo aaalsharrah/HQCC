@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import Image from 'next/image';
 
 import { Button } from '@/components/ui/button';
@@ -32,7 +33,12 @@ import {
   setDoc,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-
+// Add this NEW helper:
+async function getReplyCount(postId) {
+  const repliesRef = collection(db, 'posts', postId, 'replies');
+  const snap = await getDocs(repliesRef);
+  return snap.size;
+}
 export default function ProfilePage() {
   const router = useRouter();
 
@@ -49,145 +55,163 @@ export default function ProfilePage() {
     website: '',
   });
   const [avatarFile, setAvatarFile] = useState(null);
+  const [coverFile, setCoverFile] = useState(null);
   const [saving, setSaving] = useState(false);
 
   const mediaPosts = posts.filter((p) => p.image);
   const likedPosts = posts.filter((p) => p.isLiked);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
+    const unsub = onAuthStateChanged(auth, (user) => {
       if (!user) {
         router.push('/signin');
         return;
       }
 
-      try {
-        // Load profile from "members"
-        const refDoc = doc(db, 'members', user.uid);
-        const snap = await getDoc(refDoc);
+      (async () => {
+        try {
+          // 🔹 Load profile from "members"
+          const refDoc = doc(db, 'members', user.uid);
+          const snap = await getDoc(refDoc);
 
-        let loadedProfile;
+          let loadedProfile;
 
-        if (!snap.exists()) {
-          const fallbackName =
-            user.displayName || user.email?.split('@')[0] || 'HQCC Member';
-          const username =
-            user.email
-              ?.split('@')[0]
-              ?.toLowerCase()
-              .replace(/[^a-z0-9]/g, '') || 'member';
+          if (!snap.exists()) {
+            const fallbackName =
+              user.displayName || user.email?.split('@')[0] || 'HQCC Member';
+            const username =
+              user.email
+                ?.split('@')[0]
+                ?.toLowerCase()
+                .replace(/[^a-z0-9]/g, '') || 'member';
 
-          loadedProfile = {
-            uid: user.uid,
-            name: fallbackName,
-            username,
-            email: user.email,
-            avatar: user.photoURL || '/quantum-computing-student.jpg',
-            coverImage:
-              '/quantum-computing-chip-with-glowing-circuits-and-b.jpg',
-            bio: 'HQCC member | Quantum & Computing Enthusiast',
-            location: 'Hempstead, NY',
-            website: 'hqcc.hofstra.edu',
-            joined: 'September 2023',
-          };
+            loadedProfile = {
+              uid: user.uid,
+              name: fallbackName,
+              username,
+              email: user.email,
+              avatar: user.photoURL || '/quantum-computing-student.jpg',
+              coverImage:
+                '/quantum-computing-chip-with-glowing-circuits-and-b.jpg',
+              bio: 'HQCC member | Quantum & Computing Enthusiast',
+              location: 'Hempstead, NY',
+              website: 'hqcc.hofstra.edu',
+              joined: 'September 2023',
+            };
 
-          // create initial member doc
-          await setDoc(
-            refDoc,
-            {
-              name: loadedProfile.name,
-              username: loadedProfile.username,
-              email: loadedProfile.email,
-              avatar: loadedProfile.avatar,
-              coverImage: loadedProfile.coverImage,
-              bio: loadedProfile.bio,
-              location: loadedProfile.location,
-              website: loadedProfile.website,
-              createdAt: new Date(),
-            },
-            { merge: true }
+            // create initial member doc
+            await setDoc(
+              refDoc,
+              {
+                name: loadedProfile.name,
+                username: loadedProfile.username,
+                email: loadedProfile.email,
+                avatar: loadedProfile.avatar,
+                coverImage: loadedProfile.coverImage,
+                bio: loadedProfile.bio,
+                location: loadedProfile.location,
+                website: loadedProfile.website,
+                createdAt: new Date(),
+              },
+              { merge: true }
+            );
+          } else {
+            const data = snap.data();
+
+            loadedProfile = {
+              uid: user.uid,
+              name: data.name || 'HQCC Member',
+              username: data.username || 'member',
+              email: data.email || user.email || '',
+              avatar:
+                data.avatar ||
+                user.photoURL ||
+                '/quantum-computing-student.jpg',
+              coverImage:
+                data.coverImage ||
+                '/quantum-computing-chip-with-glowing-circuits-and-b.jpg',
+              bio: data.bio || 'HQCC member | Quantum & Computing Enthusiast',
+              location: data.location || 'Hempstead, NY',
+              website: data.website || 'hqcc.hofstra.edu',
+              joined: 'September 2023', // later: format data.createdAt
+            };
+          }
+
+          setProfile(loadedProfile);
+
+          // 🔹 Initialize edit form from loaded profile
+          setEditData({
+            name: loadedProfile.name || '',
+            username: loadedProfile.username || '',
+            bio: loadedProfile.bio || '',
+            location: loadedProfile.location || '',
+            website: loadedProfile.website || '',
+          });
+
+          // 🔹 Fetch this user's posts
+          const postsRef = collection(db, 'posts');
+          const q = query(
+            postsRef,
+            where('authorId', '==', user.uid),
+            orderBy('createdAt', 'desc')
           );
-        } else {
-          const data = snap.data();
 
-          loadedProfile = {
-            uid: user.uid,
-            name: data.name || 'HQCC Member',
-            username: data.username || 'member',
-            email: data.email || user.email || '',
-            avatar:
-              data.avatar || user.photoURL || '/quantum-computing-student.jpg',
-            coverImage:
-              data.coverImage ||
-              '/quantum-computing-chip-with-glowing-circuits-and-b.jpg',
-            bio: data.bio || 'HQCC member | Quantum & Computing Enthusiast',
-            location: data.location || 'Hempstead, NY',
-            website: data.website || 'hqcc.hofstra.edu',
-            joined: 'September 2023', // later: format data.createdAt
-          };
-        }
+          const postsSnap = await getDocs(q);
 
-        setProfile(loadedProfile);
+          const userPosts = [];
 
-        // Initialize edit form from loaded profile
-        setEditData({
-          name: loadedProfile.name || '',
-          username: loadedProfile.username || '',
-          bio: loadedProfile.bio || '',
-          location: loadedProfile.location || '',
-          website: loadedProfile.website || '',
-        });
+          for (const docSnap of postsSnap.docs) {
+            const data = docSnap.data();
 
-        // Fetch this user's posts
-        const postsRef = collection(db, 'posts');
-        const q = query(
-          postsRef,
-          where('authorId', '==', user.uid),
-          orderBy('createdAt', 'desc')
-        );
+            let replyCount = 0;
+            try {
+              replyCount = await getReplyCount(docSnap.id);
+            } catch (err) {
+              console.error(
+                'Error getting reply count for post',
+                docSnap.id,
+                err
+              );
+            }
 
-        const postsSnap = await getDocs(q);
-
-        const userPosts = postsSnap.docs.map((docSnap) => {
-          const data = docSnap.data();
-
-          return {
-            id: docSnap.id,
-            content: data.content || '',
-            timestamp: data.createdAt
-              ? data.createdAt.toDate().toLocaleString()
-              : 'Just now',
-            likes: data.likesCount ?? 0,
-            comments: data.commentsCount ?? 0,
-            shares: data.sharesCount ?? 0,
-            isLiked: false,
-            isBookmarked: false,
-            image: data.imageUrl || null,
-          };
-        });
-
-        if (userPosts.length > 0) {
-          setPosts(userPosts);
-        } else {
-          setPosts([
-            {
-              id: 'welcome',
-              content:
-                'Welcome to your HQCC profile! Start posting to see your content here.',
-              timestamp: 'just now',
-              likes: 0,
-              comments: 0,
-              shares: 0,
+            userPosts.push({
+              id: docSnap.id,
+              content: data.content || '',
+              timestamp: data.createdAt
+                ? data.createdAt.toDate().toLocaleString()
+                : 'Just now',
+              likes: data.likesCount ?? 0,
+              comments: replyCount, // ✅ reply count from subcollection
+              shares: data.sharesCount ?? 0,
               isLiked: false,
               isBookmarked: false,
-            },
-          ]);
+              image: data.imageUrl || null,
+            });
+          }
+
+          if (userPosts.length > 0) {
+            setPosts(userPosts);
+          } else {
+            setPosts([
+              {
+                id: 'welcome',
+                content:
+                  'Welcome to your HQCC profile! Start posting to see your content here.',
+                timestamp: 'just now',
+                likes: 0,
+                comments: 0,
+                shares: 0,
+                isLiked: false,
+                isBookmarked: false,
+              },
+            ]);
+          }
+        } catch (err) {
+          console.error('Error loading profile or posts:', err);
+        } finally {
+          setLoading(false);
         }
-      } catch (err) {
-        console.error('Error loading profile or posts:', err);
-      } finally {
-        setLoading(false);
-      }
+      })();
     });
 
     return () => unsub();
@@ -217,7 +241,7 @@ export default function ProfilePage() {
     );
   };
 
-  // Save profile changes (text fields + optional avatar upload)
+  // Save profile changes (text fields + avatar + cover photo)
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     if (!profile) return;
@@ -226,11 +250,18 @@ export default function ProfilePage() {
       setSaving(true);
 
       let avatarUrl = profile.avatar;
+      let coverUrl = profile.coverImage;
 
       if (avatarFile) {
         const avatarRef = ref(storage, `avatars/${profile.uid}`);
         await uploadBytes(avatarRef, avatarFile);
         avatarUrl = await getDownloadURL(avatarRef);
+      }
+
+      if (coverFile) {
+        const coverRef = ref(storage, `covers/${profile.uid}`);
+        await uploadBytes(coverRef, coverFile);
+        coverUrl = await getDownloadURL(coverRef);
       }
 
       const refDoc = doc(db, 'members', profile.uid);
@@ -247,6 +278,7 @@ export default function ProfilePage() {
           location: editData.location.trim(),
           website: editData.website.trim(),
           avatar: avatarUrl,
+          coverImage: coverUrl,
         },
         { merge: true }
       );
@@ -256,17 +288,17 @@ export default function ProfilePage() {
         ...prev,
         name: editData.name.trim() || prev.name,
         username:
-          editData.username.trim() ||
-          prev.username ||
-          prev.email.split('@')[0],
+          editData.username.trim() || prev.username || prev.email.split('@')[0],
         bio: editData.bio.trim(),
         location: editData.location.trim(),
         website: editData.website.trim(),
         avatar: avatarUrl,
+        coverImage: coverUrl,
       }));
 
       setIsEditing(false);
       setAvatarFile(null);
+      setCoverFile(null);
     } catch (err) {
       console.error('Error saving profile:', err);
       alert('Failed to save profile. Please try again.');
@@ -333,14 +365,14 @@ export default function ProfilePage() {
           <span className="text-sm">{post.likes}</span>
         </Button>
 
-        <Button
-          variant="ghost"
-          size="sm"
-          className="gap-2 text-muted-foreground hover:text-primary"
+        {/* 🔹 Open comments thread for this post */}
+        <Link
+          href={`/member/post/${post.id}`}
+          className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary text-sm"
         >
           <MessageCircle className="h-5 w-5" />
           <span className="text-sm">{post.comments}</span>
-        </Button>
+        </Link>
 
         <Button
           variant="ghost"
@@ -398,6 +430,20 @@ export default function ProfilePage() {
               width={1200}
               height={400}
             />
+
+            {isEditing && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+                <label className="bg-background/80 px-4 py-2 rounded-md text-sm cursor-pointer hover:bg-background">
+                  Change cover photo
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
+                    className="hidden"
+                  />
+                </label>
+              </div>
+            )}
           </div>
 
           {/* Add top padding so content starts below avatar */}
@@ -433,7 +479,9 @@ export default function ProfilePage() {
                 <h1 className="text-3xl font-bold text-foreground mb-1">
                   {profile.name}
                 </h1>
-                <p className="text-muted-foreground mb-4">@{profile.username}</p>
+                <p className="text-muted-foreground mb-4">
+                  @{profile.username}
+                </p>
 
                 <p className="text-foreground leading-relaxed mb-4">
                   {profile.bio}
@@ -472,6 +520,13 @@ export default function ProfilePage() {
               </div>
             ) : (
               <form onSubmit={handleSaveProfile} className="mt-4 space-y-4">
+                {/* Small note about selected cover */}
+                {coverFile && (
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Selected cover: {coverFile.name}
+                  </p>
+                )}
+
                 {/* Avatar upload */}
                 <div className="flex items-center gap-4">
                   <Avatar className="h-20 w-20 ring-2 ring-primary/40">
@@ -541,9 +596,7 @@ export default function ProfilePage() {
 
                 {/* Bio */}
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Bio
-                  </label>
+                  <label className="block text-sm font-medium mb-1">Bio</label>
                   <textarea
                     rows={3}
                     value={editData.bio}
@@ -601,6 +654,7 @@ export default function ProfilePage() {
                     onClick={() => {
                       setIsEditing(false);
                       setAvatarFile(null);
+                      setCoverFile(null);
                       // reset form to current profile values
                       setEditData({
                         name: profile.name || '',

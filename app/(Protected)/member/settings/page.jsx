@@ -7,27 +7,20 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import {
-  User,
-  Lock,
-  Shield,
-  Bell,
-  Palette,
-  Camera,
-  Mail,
-  Globe,
-  Save,
-  Trash2,
-} from 'lucide-react';
 
+import { Lock, Shield, Bell, Palette, Mail, Save, Trash2 } from 'lucide-react';
 
 // 🔥 Firebase imports
 import { auth, db } from '@/app/lib/firebase/firebase';
-import { onAuthStateChanged, updateProfile, updateEmail } from 'firebase/auth';
+import {
+  onAuthStateChanged,
+  updateEmail,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
+} from 'firebase/auth';
 import {
   doc,
   getDoc,
@@ -41,15 +34,20 @@ export default function SettingsPage() {
 
   const [currentUser, setCurrentUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [savingProfile, setSavingProfile] = useState(false);
+
+  const [savingAccount, setSavingAccount] = useState(false);
   const [savingPrivacy, setSavingPrivacy] = useState(false);
   const [savingNotifications, setSavingNotifications] = useState(false);
   const [savingAppearance, setSavingAppearance] = useState(false);
 
-  // 🔹 Profile info (synced with Firestore `members/{uid}`)
+  // Minimal profile info for account tab
   const [profile, setProfile] = useState(null);
 
-  // 🔹 Other preferences (also stored on `members/{uid}`)
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+
+  // Preferences
   const [privacy, setPrivacy] = useState({
     privateProfile: false,
     showEmail: false,
@@ -74,7 +72,7 @@ export default function SettingsPage() {
     colorScheme: 'quantum',
   });
 
-  // 🔁 Load user + member profile from Firestore
+  // Load user + member doc
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -89,7 +87,6 @@ export default function SettingsPage() {
         const snap = await getDoc(ref);
 
         if (!snap.exists()) {
-          // First-time user → create a default member doc
           const fallbackName =
             user.displayName || user.email?.split('@')[0] || 'HQCC Member';
           const username =
@@ -101,15 +98,13 @@ export default function SettingsPage() {
           const defaultData = {
             uid: user.uid,
             name: fallbackName,
-            username, // ✅ this is the key
+            username,
             email: user.email,
             bio: 'HQCC member | Quantum & Computing Enthusiast',
             location: 'Hempstead, NY',
             website: 'hqcc.hofstra.edu',
             avatar: user.photoURL || '/quantum-computing-student.jpg',
             createdAt: serverTimestamp(),
-
-            // default preferences
             privacy: {
               privateProfile: false,
               showEmail: false,
@@ -139,10 +134,6 @@ export default function SettingsPage() {
             name: defaultData.name,
             username: defaultData.username,
             email: defaultData.email,
-            bio: defaultData.bio,
-            location: defaultData.location,
-            website: defaultData.website,
-            avatar: defaultData.avatar,
           });
           setPrivacy(defaultData.privacy);
           setNotifications(defaultData.notifications);
@@ -150,17 +141,13 @@ export default function SettingsPage() {
         } else {
           const data = snap.data();
 
-          setProfile({
+          const loadedProfile = {
             name: data.name || 'HQCC Member',
             username: data.username || 'member',
             email: data.email || user.email || '',
-            bio: data.bio || 'HQCC member | Quantum & Computing Enthusiast',
-            location: data.location || '',
-            website: data.website || '',
-            avatar:
-              data.avatar || user.photoURL || '/quantum-computing-student.jpg',
-          });
+          };
 
+          setProfile(loadedProfile);
           setPrivacy({
             privateProfile: data.privacy?.privateProfile ?? false,
             showEmail: data.privacy?.showEmail ?? false,
@@ -195,49 +182,74 @@ export default function SettingsPage() {
     return () => unsub();
   }, [router]);
 
-  // 🧷 Saving handlers
+  // ✅ Update email
+  const handleUpdateEmail = async () => {
+    if (!currentUser || !profile?.email) return;
 
-  const handleSaveProfile = async () => {
-    if (!currentUser || !profile) return;
-    setSavingProfile(true);
+    if (!currentPassword) {
+      alert('Please enter your current password to update email.');
+      return;
+    }
 
+    setSavingAccount(true);
     try {
-      const ref = doc(db, 'members', currentUser.uid);
+      // Reauthenticate
+      const cred = EmailAuthProvider.credential(
+        currentUser.email,
+        currentPassword
+      );
+      await reauthenticateWithCredential(currentUser, cred);
 
-      await updateDoc(ref, {
-        name: profile.name,
-        username: profile.username,
-        email: profile.email,
-        bio: profile.bio,
-        location: profile.location,
-        website: profile.website,
-        avatar: profile.avatar,
-        updatedAt: serverTimestamp(),
-      });
+      if (profile.email !== currentUser.email) {
+        await updateEmail(currentUser, profile.email);
 
-      // optionally sync Firebase Auth displayName + email
-      try {
-        await updateProfile(currentUser, {
-          displayName: profile.name,
-          photoURL: profile.avatar,
+        const ref = doc(db, 'members', currentUser.uid);
+        await updateDoc(ref, {
+          email: profile.email,
+          updatedAt: serverTimestamp(),
         });
-      } catch (err) {
-        console.warn('Could not update auth profile:', err);
       }
 
-      if (profile.email && profile.email !== currentUser.email) {
-        try {
-          await updateEmail(currentUser, profile.email);
-        } catch (err) {
-          console.warn('Could not update auth email:', err);
-        }
-      }
-
-      console.log('Profile saved.');
+      alert('Email updated successfully.');
     } catch (err) {
-      console.error('Error saving profile:', err);
+      console.error('Error updating email:', err);
+      alert(err.message || 'Failed to update email.');
     } finally {
-      setSavingProfile(false);
+      setSavingAccount(false);
+    }
+  };
+
+  // ✅ Update password
+  const handleUpdatePassword = async () => {
+    if (!currentUser) return;
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      alert('Please fill in all password fields.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      alert('New password and confirmation do not match.');
+      return;
+    }
+
+    setSavingAccount(true);
+    try {
+      const cred = EmailAuthProvider.credential(
+        currentUser.email,
+        currentPassword
+      );
+      await reauthenticateWithCredential(currentUser, cred);
+
+      await updatePassword(currentUser, newPassword);
+
+      alert('Password updated successfully.');
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      console.error('Error updating password:', err);
+      alert(err.message || 'Failed to update password.');
+    } finally {
+      setSavingAccount(false);
     }
   };
 
@@ -250,7 +262,6 @@ export default function SettingsPage() {
         privacy,
         updatedAt: serverTimestamp(),
       });
-      console.log('Privacy settings saved.');
     } catch (err) {
       console.error('Error saving privacy:', err);
     } finally {
@@ -267,7 +278,6 @@ export default function SettingsPage() {
         notifications,
         updatedAt: serverTimestamp(),
       });
-      console.log('Notification settings saved.');
     } catch (err) {
       console.error('Error saving notifications:', err);
     } finally {
@@ -284,7 +294,6 @@ export default function SettingsPage() {
         appearance,
         updatedAt: serverTimestamp(),
       });
-      console.log('Appearance settings saved.');
     } catch (err) {
       console.error('Error saving appearance:', err);
     } finally {
@@ -302,8 +311,6 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      
-
       {/* Background effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
         <div className="absolute top-20 right-20 w-96 h-96 bg-primary/20 rounded-full blur-[120px] animate-float-gentle" />
@@ -321,15 +328,8 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="w-full bg-card/50 backdrop-blur-xl border border-border/50 p-1 grid grid-cols-2 md:grid-cols-5 gap-1">
-            <TabsTrigger
-              value="profile"
-              className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary flex items-center gap-2"
-            >
-              <User className="h-4 w-4" />
-              <span className="hidden sm:inline">Profile</span>
-            </TabsTrigger>
+        <Tabs defaultValue="account" className="space-y-6">
+          <TabsList className="w-full bg-card/50 backdrop-blur-xl border border-border/50 p-1 grid grid-cols-2 md:grid-cols-4 gap-1">
             <TabsTrigger
               value="account"
               className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary flex items-center gap-2"
@@ -360,138 +360,6 @@ export default function SettingsPage() {
             </TabsTrigger>
           </TabsList>
 
-          {/* Profile Settings */}
-          <TabsContent value="profile">
-            <Card className="p-6 bg-card/50 backdrop-blur-xl border-border/50">
-              <h2 className="text-2xl font-bold text-foreground mb-6">
-                Profile Information
-              </h2>
-
-              {/* Avatar */}
-              <div className="flex items-center gap-6 mb-8">
-                <Avatar className="h-24 w-24 ring-4 ring-primary/20">
-                  <AvatarImage src={profile.avatar || '/placeholder.svg'} />
-                  <AvatarFallback className="text-2xl">
-                    {profile.name.slice(0, 2)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="space-y-2">
-                  <Button
-                    variant="outline"
-                    className="gap-2 bg-transparent"
-                    type="button"
-                  >
-                    <Camera className="h-4 w-4" />
-                    Change Avatar
-                  </Button>
-                  <p className="text-xs text-muted-foreground">
-                    JPG, PNG or GIF. Max 2MB.
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Full Name</Label>
-                    <Input
-                      id="name"
-                      value={profile.name}
-                      onChange={(e) =>
-                        setProfile({ ...profile, name: e.target.value })
-                      }
-                      className="bg-background/50 border-border/50 focus:border-primary"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="username">Username</Label>
-                    <Input
-                      id="username"
-                      value={profile.username}
-                      onChange={(e) =>
-                        setProfile({
-                          ...profile,
-                          username: e.target.value,
-                        })
-                      }
-                      className="bg-background/50 border-border/50 focus:border-primary"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="bio">Bio</Label>
-                  <Textarea
-                    id="bio"
-                    value={profile.bio}
-                    onChange={(e) =>
-                      setProfile({ ...profile, bio: e.target.value })
-                    }
-                    className="bg-background/50 border-border/50 focus:border-primary min-h-[100px]"
-                    maxLength={160}
-                  />
-                  <p className="text-xs text-muted-foreground text-right">
-                    {profile.bio.length}/160
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="location"
-                      className="flex items-center gap-2"
-                    >
-                      <Globe className="h-4 w-4" />
-                      Location
-                    </Label>
-                    <Input
-                      id="location"
-                      value={profile.location}
-                      onChange={(e) =>
-                        setProfile({
-                          ...profile,
-                          location: e.target.value,
-                        })
-                      }
-                      className="bg-background/50 border-border/50 focus:border-primary"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label
-                      htmlFor="website"
-                      className="flex items-center gap-2"
-                    >
-                      <Globe className="h-4 w-4" />
-                      Website
-                    </Label>
-                    <Input
-                      id="website"
-                      value={profile.website}
-                      onChange={(e) =>
-                        setProfile({
-                          ...profile,
-                          website: e.target.value,
-                        })
-                      }
-                      className="bg-background/50 border-border/50 focus:border-primary"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end pt-4">
-                  <Button
-                    onClick={handleSaveProfile}
-                    className="bg-primary hover:bg-primary/90 gap-2"
-                    disabled={savingProfile}
-                  >
-                    <Save className="h-4 w-4" />
-                    {savingProfile ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          </TabsContent>
-
           {/* Account Settings */}
           <TabsContent value="account">
             <Card className="p-6 bg-card/50 backdrop-blur-xl border-border/50">
@@ -500,6 +368,7 @@ export default function SettingsPage() {
               </h2>
 
               <div className="space-y-6">
+                {/* Email */}
                 <div className="space-y-2">
                   <Label htmlFor="email" className="flex items-center gap-2">
                     <Mail className="h-4 w-4" />
@@ -517,8 +386,23 @@ export default function SettingsPage() {
                     }
                     className="bg-background/50 border-border/50 focus:border-primary"
                   />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="mt-2 gap-2 bg-transparent"
+                    onClick={handleUpdateEmail}
+                    disabled={savingAccount}
+                  >
+                    <Save className="h-4 w-4" />
+                    {savingAccount ? 'Updating Email...' : 'Update Email'}
+                  </Button>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    To update your email, you must enter your current password
+                    below.
+                  </p>
                 </div>
 
+                {/* Password */}
                 <div className="space-y-4 pt-4 border-t border-border/50">
                   <h3 className="text-lg font-semibold text-foreground">
                     Change Password
@@ -528,6 +412,8 @@ export default function SettingsPage() {
                     <Input
                       id="current-password"
                       type="password"
+                      value={currentPassword}
+                      onChange={(e) => setCurrentPassword(e.target.value)}
                       className="bg-background/50 border-border/50 focus:border-primary"
                     />
                   </div>
@@ -536,6 +422,8 @@ export default function SettingsPage() {
                     <Input
                       id="new-password"
                       type="password"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
                       className="bg-background/50 border-border/50 focus:border-primary"
                     />
                   </div>
@@ -546,6 +434,8 @@ export default function SettingsPage() {
                     <Input
                       id="confirm-password"
                       type="password"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
                       className="bg-background/50 border-border/50 focus:border-primary"
                     />
                   </div>
@@ -553,12 +443,15 @@ export default function SettingsPage() {
                     variant="outline"
                     className="gap-2 bg-transparent"
                     type="button"
+                    onClick={handleUpdatePassword}
+                    disabled={savingAccount}
                   >
                     <Lock className="h-4 w-4" />
-                    Update Password
+                    {savingAccount ? 'Updating Password...' : 'Update Password'}
                   </Button>
                 </div>
 
+                {/* Danger Zone (same as before) */}
                 <div className="space-y-4 pt-4 border-t border-border/50">
                   <h3 className="text-lg font-semibold text-destructive">
                     Danger Zone
