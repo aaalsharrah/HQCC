@@ -17,10 +17,11 @@ import {
 
 import { auth } from '@/app/lib/firebase/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
+
 import {
   createPost,
   subscribeToPosts,
-  incrementLikes,
+  toggleLike,
 } from '@/app/lib/firebase/post';
 
 export default function FeedPage() {
@@ -50,29 +51,32 @@ export default function FeedPage() {
   }, []);
 
   const handleLike = async (postId) => {
-    // Local UI update
+    if (!currentUser) {
+      alert('You must be logged in to like posts.');
+      return;
+    }
+
+    // Optimistic UI update
     setPosts((prev) =>
       prev.map((post) =>
         post.id === postId
           ? {
               ...post,
+              isLiked: !post.isLiked,
               likesCount: post.isLiked
                 ? Math.max(0, (post.likesCount ?? 0) - 1)
                 : (post.likesCount ?? 0) + 1,
-              isLiked: !post.isLiked,
             }
           : post
       )
     );
 
-    // Optional: persist to Firestore
+    // Firestore toggle (one like per user)
     try {
-      const target = posts.find((p) => p.id === postId);
-      const delta = target?.isLiked ? -1 : 1;
-      await incrementLikes(postId, delta);
+      await toggleLike(postId, currentUser.uid);
     } catch (e) {
-      console.error('Failed to update likesCount', e);
-      // You could also revert UI if you want
+      console.error('Failed to toggle like', e);
+      // optional: revert UI here if you want
     }
   };
 
@@ -101,7 +105,7 @@ export default function FeedPage() {
       });
 
       setNewPost('');
-      // No need to manually add to state, subscribeToPosts will pick it up
+      // subscribeToPosts will pick it up
     } catch (err) {
       console.error('Error creating post:', err);
       alert('Failed to create post. Please try again.');
@@ -137,7 +141,7 @@ export default function FeedPage() {
           <div className="flex gap-4">
             <Avatar className="h-12 w-12 ring-2 ring-primary/20">
               <AvatarImage
-                src={currentUser?.photoURL || '/diverse-user-avatars.png'}
+                src={currentUser?.photoURL || '/images.jpeg'}
               />
               <AvatarFallback>
                 {currentUser?.displayName
@@ -213,7 +217,6 @@ export default function FeedPage() {
                       <span className="text-xs text-muted-foreground">
                         {post.authorEmail}
                       </span>
-                      {/* Optional role pill – if you don’t have roles yet, you can remove this */}
                       <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
                         Member
                       </span>
@@ -229,7 +232,6 @@ export default function FeedPage() {
                   {post.content}
                 </p>
 
-                {/* Post actions */}
                 {/* Post actions */}
                 <div className="flex items-center justify-between pt-4 border-t border-border/50">
                   <div className="flex items-center gap-2">
@@ -248,7 +250,9 @@ export default function FeedPage() {
                           post.isLiked ? 'fill-current' : ''
                         }`}
                       />
-                      <span className="text-sm">{post.likesCount ?? 0}</span>
+                      <span className="text-sm">
+                        {post.likesCount ?? 0}
+                      </span>
                     </Button>
 
                     <Link

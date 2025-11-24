@@ -9,6 +9,9 @@ import {
   updateDoc,
   doc,
   increment,
+  setDoc,
+  deleteDoc,
+  getDoc,
 } from 'firebase/firestore';
 import { db } from '@/app/lib/firebase/firebase';
 
@@ -60,7 +63,9 @@ export async function createPost({ content, user }) {
   const postDoc = {
     authorId: user.uid,
     authorName:
-      user.displayName || (user.email && user.email.split('@')[0]) || 'Member',
+      user.displayName ||
+      (user.email && user.email.split('@')[0]) ||
+      'Member',
     authorEmail: user.email || null,
     content,
     createdAt: serverTimestamp(),
@@ -72,7 +77,8 @@ export async function createPost({ content, user }) {
 }
 
 /**
- * Increment likesCount for a post
+ * (Still here if you use it somewhere else)
+ * Increment likesCount for a post directly
  */
 export async function incrementLikes(postId, delta = 1) {
   const postRef = doc(db, POSTS_COLLECTION, postId);
@@ -104,7 +110,7 @@ export function subscribeToPost(postId, callback) {
       createdAt: data.createdAt,
       likesCount: data.likesCount ?? 0,
 
-      // UI-only flags (can be overridden in the component)
+      // UI-only flags
       isLiked: false,
       isBookmarked: false,
       timestamp: data.createdAt
@@ -165,4 +171,34 @@ export async function createReply({ postId, content, user }) {
     authorEmail: user.email || null,
     createdAt: serverTimestamp(),
   });
+}
+
+/**
+ * 🔑 New: Toggle like for a post, one per user
+ * stores likes in: posts/{postId}/likes/{userId}
+ */
+export async function toggleLike(postId, userId) {
+  const likeRef = doc(db, POSTS_COLLECTION, postId, 'likes', userId);
+  const postRef = doc(db, POSTS_COLLECTION, postId);
+
+  const snap = await getDoc(likeRef);
+
+  if (snap.exists()) {
+    // UNLIKE
+    await deleteDoc(likeRef);
+    await updateDoc(postRef, {
+      likesCount: increment(-1),
+    });
+    return false; // now unliked
+  } else {
+    // LIKE
+    await setDoc(likeRef, {
+      userId,
+      createdAt: serverTimestamp(),
+    });
+    await updateDoc(postRef, {
+      likesCount: increment(1),
+    });
+    return true; // now liked
+  }
 }

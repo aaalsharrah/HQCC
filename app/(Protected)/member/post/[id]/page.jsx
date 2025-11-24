@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, use } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -19,7 +19,8 @@ import {
   incrementLikes,
 } from '@/app/lib/firebase/post';
 
-export default function PostThreadPage({ params }) {
+export default function PostThreadPage(props) {
+  const params = use(props.params);
   const { id } = params; // post id
   const router = useRouter();
 
