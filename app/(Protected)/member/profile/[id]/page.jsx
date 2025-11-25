@@ -422,7 +422,7 @@ export default function ProfilePage() {
       <main className="max-w-4xl mx-auto px-4 pt-20 pb-20">
         {/* Profile header */}
         <Card className="overflow-hidden bg-card/50 backdrop-blur-xl border-border/50 mb-6">
-          <div className="relative h-48 md:h-64 bg-gradient-to-r from-primary/20 via-accent/20 to-secondary/20">
+          <div className="relative h-48 md:h-64 bg-linear-to-r from-primary/20 via-accent/20 to-secondary/20">
             <Image
               src={profile.coverImage || '/placeholder.svg'}
               alt="Cover"
@@ -463,7 +463,7 @@ export default function ProfilePage() {
               <Button
                 onClick={() => setIsEditing((prev) => !prev)}
                 className="
-                  bg-gradient-to-r from-primary via-accent to-secondary
+                  bg-linear-to-r from-primary via-accent to-secondary
                   text-white font-medium
                   hover:opacity-90
                   transition-all
@@ -671,7 +671,7 @@ export default function ProfilePage() {
                     type="submit"
                     disabled={saving}
                     className="
-                      bg-gradient-to-r from-primary via-accent to-secondary
+                      bg-linear-to-r from-primary via-accent to-secondary
                       text-white font-medium
                       hover:opacity-90
                       transition-all
@@ -748,10 +748,11 @@ export default function ProfilePage() {
                     key={post.id}
                     className="relative aspect-square rounded-lg overflow-hidden border border-border/50 group cursor-pointer"
                   >
-                    <img
+                    <Image
                       src={post.image || '/placeholder.svg'}
                       alt="Media"
-                      className="w-full h-full object-cover transition-transform group-hover:scale-110"
+                      fill
+                      className="object-cover transition-transform group-hover:scale-110"
                     />
                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-4">
                       <div className="flex items-center gap-1 text-white">

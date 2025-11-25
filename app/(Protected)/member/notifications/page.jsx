@@ -35,7 +35,7 @@ export default function NotificationsPage() {
           <div className="mb-8">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h1 className="text-4xl font-bold mb-2 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+                <h1 className="text-4xl font-bold mb-2 bg-linear-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
                   Notifications
                 </h1>
 
@@ -101,7 +101,7 @@ export default function NotificationsPage() {
               >
                 <div className="flex gap-4">
                   {/* ICON */}
-                  <div className="flex-shrink-0 mt-1">
+                  <div className="shrink-0 mt-1">
                     {getNotificationIcon(notification.type)}
                   </div>
 
@@ -146,7 +146,7 @@ export default function NotificationsPage() {
 
                   {/* UNREAD DOT */}
                   {!notification.read && (
-                    <div className="flex-shrink-0">
+                    <div className="shrink-0">
                       <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                     </div>
                   )}

@@ -140,7 +140,7 @@ export default function AdminDashboard() {
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
             <div>
               <h1 className="text-4xl sm:text-5xl font-bold mb-2">
-                <span className="bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+                <span className="bg-linear-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
                   Admin Dashboard
                 </span>
               </h1>
@@ -278,7 +278,7 @@ export default function AdminDashboard() {
                         className="flex items-center justify-between p-3 rounded-lg bg-background/50 hover:bg-background transition-colors"
                       >
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-sm font-bold text-primary-foreground">
+                          <div className="w-10 h-10 rounded-full bg-linear-to-br from-primary to-accent flex items-center justify-center text-sm font-bold text-primary-foreground">
                             {user.name
                               .split(' ')
                               .map((n) => n[0])
@@ -397,7 +397,7 @@ export default function AdminDashboard() {
                         >
                           <td className="p-4">
                             <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-sm font-bold text-primary-foreground">
+                              <div className="w-10 h-10 rounded-full bg-linear-to-br from-primary to-accent flex items-center justify-center text-sm font-bold text-primary-foreground">
                                 {user.name
                                   .split(' ')
                                   .map((n) => n[0])
