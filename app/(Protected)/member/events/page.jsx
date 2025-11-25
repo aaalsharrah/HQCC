@@ -11,7 +11,6 @@ import {
   getDocs,
   Timestamp,
 } from 'firebase/firestore';
-import { createEventNotificationsForAllMembers } from '@/app/lib/firebase/notifications';
 
 // Helper function to parse event date
 function parseEventDate(dateField) {
@@ -163,25 +162,8 @@ export default function EventsPage() {
         console.log('Past events:', past.length);
         console.log('Upcoming events list:', upcoming.map(e => ({ title: e.title, date: e.date })));
 
-        // Create notifications for upcoming events that don't have them yet
-        // This backfills notifications for existing events
-        // Use Promise.allSettled to handle all events even if some fail
-        Promise.allSettled(
-          upcoming.map((event) =>
-            createEventNotificationsForAllMembers(
-              event.id,
-              event.title,
-              event.date,
-              event.time
-            )
-          )
-        ).then((results) => {
-          results.forEach((result, index) => {
-            if (result.status === 'rejected') {
-              console.error(`Error creating notifications for event ${upcoming[index].id}:`, result.reason);
-            }
-          });
-        });
+        // Note: Event notifications are created when admins create events via the admin dashboard
+        // This ensures proper permissions and avoids permission errors on the public events page
 
         setUpcomingEvents(upcoming);
         setPastEvents(past);

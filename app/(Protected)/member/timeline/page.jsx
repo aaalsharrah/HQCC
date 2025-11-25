@@ -76,6 +76,40 @@ export default function FeedPage() {
     );
   };
 
+  // Subscribe to posts on mount
+  useEffect(() => {
+    let unsubscribePosts = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      // Clean up previous subscription if it exists
+      if (unsubscribePosts) {
+        unsubscribePosts();
+      }
+
+      if (!user) {
+        setCurrentUser(null);
+        setLoadingPosts(false);
+        setPosts([]);
+        return;
+      }
+
+      setCurrentUser(user);
+
+      // Subscribe to posts with user ID for like status
+      unsubscribePosts = subscribeToPosts((postsData) => {
+        setPosts(postsData);
+        setLoadingPosts(false);
+      }, user.uid);
+    });
+
+    return () => {
+      if (unsubscribePosts) {
+        unsubscribePosts();
+      }
+      unsubscribeAuth();
+    };
+  }, []);
+
   const handleImageSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;

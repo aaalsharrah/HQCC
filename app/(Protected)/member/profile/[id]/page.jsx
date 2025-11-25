@@ -818,7 +818,7 @@ export default function ProfilePage() {
 
                   <div className="flex items-center gap-1">
                     <Calendar className="h-4 w-4" />
-                    <span>Joined {profile.joined}</span>
+                    <span>Joined {profile.joined instanceof Date ? profile.joined.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : profile.joined}</span>
                   </div>
                 </div>
               </div>

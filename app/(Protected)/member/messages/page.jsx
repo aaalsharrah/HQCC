@@ -20,6 +20,18 @@ export default function MessagesPage() {
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
 
+  // Filter conversations based on search query
+  const filteredConversations = conversations.filter((conv) => {
+    if (!searchQuery) return true;
+    const query = searchQuery.toLowerCase();
+    return (
+      conv.name?.toLowerCase().includes(query) ||
+      conv.email?.toLowerCase().includes(query) ||
+      conv.lastMessage?.toLowerCase().includes(query) ||
+      conv.bookTitle?.toLowerCase().includes(query)
+    );
+  });
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
