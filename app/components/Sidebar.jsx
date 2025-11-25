@@ -28,7 +28,11 @@ const baseNavItems = [
   { label: 'Events', href: '/member/events', icon: User },
   { label: 'Messages', href: '/member/messages', icon: MessageCircle },
   { label: 'Notifications', href: '/member/notifications', icon: Bell },
+<<<<<<< HEAD
   { label: 'Profile', href: '/member/profile', icon: User },
+=======
+  { label: 'Profile', href: '/member/profile/test', icon: User }, // later: swap 'test'
+>>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
   { label: 'Settings', href: '/member/settings', icon: User },
 ];
 

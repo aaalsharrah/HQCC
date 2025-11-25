@@ -2,9 +2,12 @@
   "firestore": {
     "rules": "firestore.rules"
   },
+<<<<<<< HEAD
   "storage": {
     "rules": "storage.rules"
   },
+=======
+>>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
   "hosting": {
     "public": "out",
     "ignore": [
