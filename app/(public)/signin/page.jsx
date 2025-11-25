@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Mail, Lock } from 'lucide-react';
+import { ArrowLeft, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -18,11 +18,14 @@ import {
   browserLocalPersistence,
   browserSessionPersistence,
 } from 'firebase/auth';
+import { db } from '@/app/lib/firebase/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 export default function SignInPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
@@ -40,11 +43,23 @@ export default function SignInPage() {
 
       await signInWithEmailAndPassword(auth, email, password);
       const user = auth.currentUser;
-
       if (!user) throw new Error('No user after sign in');
 
-      // 🔁 redirect to their own profile using uid
-      router.push(`/member/profile/${user.uid}`);
+      // 🔎 Get role from Firestore: members/{uid}
+      const ref = doc(db, 'members', user.uid);
+      const snap = await getDoc(ref);
+      const role = snap.exists() ? snap.data().role || 'member' : 'member';
+
+      // 🍪 Set cookies for middleware
+      document.cookie = `logged_in=true; path=/;`;
+      document.cookie = `role=${role}; path=/;`;
+
+      // 🔁 Redirect based on role
+      if (role === 'admin') {
+        router.push('/admin/dashboard');
+      } else {
+        router.push(`/member/profile/${user.uid}`);
+      }
     } catch (err) {
       console.error(err);
       if (
@@ -78,7 +93,21 @@ export default function SignInPage() {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
-      router.push(`/member/profile/${user.uid}`);
+      // 🔎 Get role from Firestore
+      const ref = doc(db, 'members', user.uid);
+      const snap = await getDoc(ref);
+      const role = snap.exists() ? snap.data().role || 'member' : 'member';
+
+      // 🍪 Set cookies for middleware
+      document.cookie = `logged_in=true; path=/;`;
+      document.cookie = `role=${role}; path=/;`;
+
+      // 🔁 Redirect based on role
+      if (role === 'admin') {
+        router.push('/admin/dashboard');
+      } else {
+        router.push(`/member/profile/${user.uid}`);
+      }
     } catch (err) {
       console.error(err);
       setError('Failed to sign in with provider. Please try again.');
@@ -169,13 +198,25 @@ export default function SignInPage() {
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 h-12 bg-background/50 border-border focus:border-primary transition-colors"
+                  className="pl-10 pr-10 h-12 bg-background/50 border-border focus:border-primary transition-colors"
                   required
                 />
+
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </button>
               </div>
             </div>
 

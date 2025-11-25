@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ArrowLeft, Mail, Lock, User } from 'lucide-react';
+import { ArrowLeft, Mail, Lock, User, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -28,6 +28,8 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const handleChange = (e) => {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
@@ -50,6 +52,22 @@ export default function SignUpPage() {
       website: '',
       avatar: user.photoURL || null,
       coverImage: null,
+      createdAt: serverTimestamp(),
+    });
+  };
+
+  const createMemberDoc = async (user, name) => {
+    const username =
+      user.email
+        ?.split('@')[0]
+        ?.toLowerCase()
+        .replace(/[^a-z0-9]/g, '') || 'member';
+
+    await setDoc(doc(db, 'members', user.uid), {
+      uid: user.uid,
+      name: name || username,
+      email: user.email,
+      role: 'member', // 🔥 default role
       createdAt: serverTimestamp(),
     });
   };
@@ -83,9 +101,17 @@ export default function SignUpPage() {
         displayName: name,
       });
 
+      // 🔹 Create both profile + member docs
       await createProfileDoc(userCred.user, name);
+      await createMemberDoc(userCred.user, name);
 
+      // 🔹 Set cookies so middleware considers them logged in
+      document.cookie = `logged_in=true; path=/;`;
+      document.cookie = `role=member; path=/;`;
+
+      // 🔁 Redirect to their profile or timeline
       router.push(`/member/profile/${userCred.user.uid}`);
+      // or: router.push('/member/timeline');
     } catch (err) {
       console.error(err);
 
@@ -114,9 +140,16 @@ export default function SignUpPage() {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
+      // Create docs if they don't exist
       await createProfileDoc(user, user.displayName);
+      await createMemberDoc(user, user.displayName);
+
+      // Set cookies for middleware
+      document.cookie = `logged_in=true; path=/;`;
+      document.cookie = `role=member; path=/;`;
 
       router.push(`/member/profile/${user.uid}`);
+      // or: router.push('/member/timeline');
     } catch (err) {
       console.error(err);
       setError('Failed to sign up with provider. Please try again.');
@@ -226,18 +259,32 @@ export default function SignUpPage() {
               >
                 Password
               </Label>
+
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+
                 <Input
                   id="password"
                   name="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   placeholder="Create a strong password"
                   value={formData.password}
                   onChange={handleChange}
-                  className="pl-10 h-12 bg-background/50 border-border focus:border-primary transition-colors"
+                  className="pl-10 pr-10 h-12 bg-background/50 border-border focus:border-primary transition-colors"
                   required
                 />
+
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </button>
               </div>
             </div>
 
@@ -248,18 +295,32 @@ export default function SignUpPage() {
               >
                 Confirm Password
               </Label>
+
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+
                 <Input
                   id="confirmPassword"
                   name="confirmPassword"
-                  type="password"
+                  type={showConfirmPassword ? 'text' : 'password'}
                   placeholder="Re-enter your password"
                   value={formData.confirmPassword}
                   onChange={handleChange}
-                  className="pl-10 h-12 bg-background/50 border-border focus:border-primary transition-colors"
+                  className="pl-10 pr-10 h-12 bg-background/50 border-border focus:border-primary transition-colors"
                   required
                 />
+
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff className="h-5 w-5" />
+                  ) : (
+                    <Eye className="h-5 w-5" />
+                  )}
+                </button>
               </div>
             </div>
 

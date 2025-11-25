@@ -13,14 +13,16 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  Shield,
 } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { auth } from '@/app/lib/firebase/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
+import { db } from '@/app/lib/firebase/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
-const navItems = [
-  { label: 'Home', href: '/', icon: Home },
+const baseNavItems = [
   { label: 'Timeline', href: '/member/timeline', icon: Clock },
   { label: 'Community', href: '/member/community', icon: User },
   { label: 'Events', href: '/member/events', icon: User },
@@ -34,16 +36,44 @@ export default function Sidebar({ collapsed, onToggle }) {
   const pathname = usePathname();
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState(null);
+  const [role, setRole] = useState(null); // 'admin' | 'member' | null
+  const [loadingRole, setLoadingRole] = useState(true);
 
   useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
+    const unsub = onAuthStateChanged(auth, async (user) => {
       setCurrentUser(user || null);
+
+      if (!user) {
+        setRole(null);
+        setLoadingRole(false);
+        return;
+      }
+
+      try {
+        const ref = doc(db, 'members', user.uid);
+        const snap = await getDoc(ref);
+        if (snap.exists()) {
+          const data = snap.data();
+          setRole(data.role || null);
+        } else {
+          setRole(null);
+        }
+      } catch (err) {
+        console.error('Error fetching user role:', err);
+        setRole(null);
+      } finally {
+        setLoadingRole(false);
+      }
     });
+
     return () => unsub();
   }, []);
-
   const handleLogout = async () => {
     try {
+      // ❌ Clear cookies for middleware
+      document.cookie = 'logged_in=false; Max-Age=0; path=/;';
+      document.cookie = 'role=; Max-Age=0; path=/;';
+
       await signOut(auth);
       router.push('/signin');
     } catch (err) {
@@ -52,9 +82,7 @@ export default function Sidebar({ collapsed, onToggle }) {
   };
 
   const displayName =
-    currentUser?.displayName ||
-    currentUser?.email?.split('@')[0] ||
-    'Member';
+    currentUser?.displayName || currentUser?.email?.split('@')[0] || 'Member';
 
   const username =
     currentUser?.email
@@ -62,8 +90,21 @@ export default function Sidebar({ collapsed, onToggle }) {
       ?.toLowerCase()
       .replace(/[^a-z0-9]/g, '') || 'member';
 
-  const avatarUrl =
-    currentUser?.photoURL || '/quantum-computing-student.jpg';
+  const avatarUrl = currentUser?.photoURL || '/quantum-computing-student.jpg';
+
+  // Build nav items including admin if role is admin
+  const navItems = [
+    ...baseNavItems,
+    ...(role === 'admin'
+      ? [
+          {
+            label: 'Admin',
+            href: '/admin/dashboard',
+            icon: Shield,
+          },
+        ]
+      : []),
+  ];
 
   return (
     <aside
@@ -98,6 +139,8 @@ export default function Sidebar({ collapsed, onToggle }) {
 
       {/* NAV ITEMS */}
       <nav className="flex-1 mt-4 space-y-1 px-2 overflow-y-auto">
+        {/* Optionally, while loading role you can show only base items or a skeleton.
+            Right now we still show base + (maybe) admin once role loads. */}
         {navItems.map((item) => {
           const Icon = item.icon;
           const isActive =
@@ -139,12 +182,15 @@ export default function Sidebar({ collapsed, onToggle }) {
 
           {!collapsed && (
             <div className="min-w-0">
-              <p className="text-sm font-semibold truncate">
-                {displayName}
-              </p>
+              <p className="text-sm font-semibold truncate">{displayName}</p>
               <p className="text-xs text-muted-foreground truncate">
                 @{username}
               </p>
+              {role && (
+                <p className="text-[11px] text-primary/80 mt-0.5 uppercase tracking-wide">
+                  {role}
+                </p>
+              )}
             </div>
           )}
         </div>
