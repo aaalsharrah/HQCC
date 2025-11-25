@@ -14,7 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useState, use } from 'react';
 
 // Event data (in production, this would come from a database)
 const eventsData = {
@@ -197,7 +197,8 @@ const eventsData = {
   },
 };
 
-export default function EventDetailPage({ params }) {
+export default function EventDetailPage(props) {
+  const params = use(props.params);
   // params.id is a string ('1', '2', '3') – JS will coerce it to the right key
   const event = eventsData[params.id];
   const [isRegistered, setIsRegistered] = useState(false);

@@ -26,23 +26,145 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
 
+const initialEvents = [
+  {
+    id: 1,
+    title: 'Quantum Computing Workshop',
+    date: '2024-02-15',
+    time: '6:00 PM - 8:00 PM',
+    location: 'Engineering Lab 201',
+    attendees: 45,
+    status: 'Scheduled',
+    category: 'Workshop',
+    description:
+      'Hands-on introduction to quantum algorithms and circuit design using Qiskit.',
+    image: '/quantum-computing-workshop.jpg',
+    spots: 50,
+    organizer: {
+      name: 'Abdallah Aisharrah',
+      role: 'Founder & President',
+      avatar: '/professional-man.jpg',
+    },
+    agenda: [
+      { time: '6:00 PM', title: 'Welcome & Introduction', duration: '15 min' },
+      { time: '6:15 PM', title: 'Quantum Basics Overview', duration: '30 min' },
+      {
+        time: '6:45 PM',
+        title: 'Hands-on Qiskit Tutorial',
+        duration: '45 min',
+      },
+      {
+        time: '7:30 PM',
+        title: 'Build Your First Circuit',
+        duration: '20 min',
+      },
+      { time: '7:50 PM', title: 'Q&A Session', duration: '10 min' },
+    ],
+    requirements: [
+      'Laptop with Python installed',
+      'Basic programming knowledge',
+      'Qiskit installed (installation guide will be sent)',
+      'Curiosity and enthusiasm!',
+    ],
+    attendeesList: [],
+  },
+  {
+    id: 2,
+    title: 'Guest Lecture: IBM Quantum',
+    date: '2024-02-22',
+    time: '7:00 PM - 9:00 PM',
+    location: 'Auditorium Hall A',
+    attendees: 120,
+    status: 'Scheduled',
+    category: 'Lecture',
+    description:
+      'Industry leader from IBM Quantum discusses the future of quantum computing.',
+    image: '/quantum-lecture-hall.jpg',
+    spots: 150,
+    organizer: {
+      name: 'Abdallah Aisharrah',
+      role: 'Founder & President',
+      avatar: '/professional-man.jpg',
+    },
+    agenda: [
+      { time: '7:00 PM', title: 'Introduction & Welcome', duration: '10 min' },
+      { time: '7:10 PM', title: 'IBM Quantum Overview', duration: '30 min' },
+      { time: '7:40 PM', title: 'Recent Breakthroughs', duration: '40 min' },
+      { time: '8:20 PM', title: 'Industry Applications', duration: '20 min' },
+      { time: '8:40 PM', title: 'Q&A with Speaker', duration: '20 min' },
+    ],
+    requirements: [
+      'No prerequisites required',
+      'Bring your questions!',
+      'Business casual attire recommended',
+    ],
+    attendeesList: [],
+  },
+  {
+    id: 3,
+    title: 'Quantum Hackathon 2024',
+    date: '2024-03-10',
+    time: '9:00 AM - 6:00 PM',
+    location: 'Computer Science Building',
+    attendees: 80,
+    status: 'Draft',
+    category: 'Hackathon',
+    description:
+      '24-hour quantum computing hackathon with prizes and mentorship.',
+    image: '/hackathon-coding.jpg',
+    spots: 100,
+    organizer: {
+      name: 'Abdallah Aisharrah',
+      role: 'Founder & President',
+      avatar: '/professional-man.jpg',
+    },
+    agenda: [
+      { time: '9:00 AM', title: 'Check-in & Breakfast', duration: '60 min' },
+      { time: '10:00 AM', title: 'Kickoff & Rules', duration: '30 min' },
+    ],
+    requirements: ['Laptop', 'GitHub account', 'Team spirit'],
+    attendeesList: [],
+  },
+];
+
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [searchQuery, setSearchQuery] = useState('');
+  const [events, setEvents] = useState(initialEvents);
 
-  // Analytics data
+  const [form, setForm] = useState({
+    title: '',
+    category: '',
+    date: '',
+    time: '',
+    location: '',
+    spots: '',
+    image: '',
+    description: '',
+    organizerName: '',
+    organizerRole: '',
+    organizerAvatar: '',
+    agendaText: '',
+    requirementsText: '',
+  });
+
   const analytics = {
     totalUsers: 45,
     activeUsers: 38,
     newUsersThisMonth: 12,
-    totalEvents: 28,
-    upcomingEvents: 5,
-    completedEvents: 23,
-    avgAttendance: 32,
+    totalEvents: events.length,
+    upcomingEvents: events.filter((e) => e.status === 'Scheduled').length,
+    completedEvents: events.filter((e) => e.status === 'Completed').length,
+    avgAttendance:
+      events.length > 0
+        ? Math.round(
+            events.reduce((sum, e) => sum + (e.attendees || 0), 0) /
+              events.length,
+          )
+        : 0,
     engagementRate: 84,
   };
 
-  // Sample user data
   const users = [
     {
       id: 1,
@@ -96,36 +218,83 @@ export default function AdminDashboard() {
     },
   ];
 
-  // Sample event data (ids match member events + detail page)
-  const events = [
-    {
-      id: 1,
-      title: 'Quantum Computing Workshop',
-      date: '2024-02-15',
-      time: '6:00 PM - 8:00 PM',
-      location: 'Engineering Lab 201',
-      attendees: 45,
+  const handleFormChange = (field) => (e) => {
+    setForm((prev) => ({
+      ...prev,
+      [field]: e.target.value,
+    }));
+  };
+
+  const handleCreateEvent = () => {
+    if (!form.title || !form.date || !form.time || !form.location) {
+      alert('Please fill in at least Title, Date, Time, and Location.');
+      return;
+    }
+
+    const newId =
+      events.length > 0 ? Math.max(...events.map((e) => e.id)) + 1 : 1;
+
+    const agenda =
+      form.agendaText
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => {
+          const [time, title, duration] = line.split('|').map((s) => s.trim());
+          return {
+            time: time || '',
+            title: title || '',
+            duration: duration || '',
+          };
+        }) || [];
+
+    const requirements =
+      form.requirementsText
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean) || [];
+
+    const newEvent = {
+      id: newId,
+      title: form.title,
+      date: form.date,
+      time: form.time,
+      location: form.location,
+      attendees: 0,
       status: 'Scheduled',
-    },
-    {
-      id: 2,
-      title: 'Guest Lecture: IBM Quantum',
-      date: '2024-02-22',
-      time: '7:00 PM - 9:00 PM',
-      location: 'Auditorium Hall A',
-      attendees: 120,
-      status: 'Scheduled',
-    },
-    {
-      id: 3,
-      title: 'Quantum Hackathon 2024',
-      date: '2024-03-10',
-      time: '9:00 AM - 6:00 PM',
-      location: 'Computer Science Building',
-      attendees: 80,
-      status: 'Draft',
-    },
-  ];
+      category: form.category || 'Event',
+      description: form.description,
+      image: form.image || '/placeholder.svg',
+      spots: Number(form.spots) || 0,
+      organizer: {
+        name: form.organizerName || 'HQCC Team',
+        role: form.organizerRole || 'Organizer',
+        avatar: form.organizerAvatar || '/professional-man.jpg',
+      },
+      agenda,
+      requirements,
+      attendeesList: [],
+    };
+
+    setEvents((prev) => [...prev, newEvent]);
+
+    // reset form
+    setForm({
+      title: '',
+      category: '',
+      date: '',
+      time: '',
+      location: '',
+      spots: '',
+      image: '',
+      description: '',
+      organizerName: '',
+      organizerRole: '',
+      organizerAvatar: '',
+      agendaText: '',
+      requirementsText: '',
+    });
+  };
 
   return (
     <div className="relative min-h-screen bg-background">
@@ -217,7 +386,8 @@ export default function AdminDashboard() {
                       <Calendar className="h-6 w-6 text-accent" />
                     </div>
                     <Badge variant="secondary" className="gap-1">
-                      <Clock className="h-3 w-3" />5
+                      <Clock className="h-3 w-3" />
+                      {analytics.upcomingEvents}
                     </Badge>
                   </div>
                   <div className="text-3xl font-bold mb-1">
@@ -339,7 +509,6 @@ export default function AdminDashboard() {
 
             {/* Users Tab */}
             <TabsContent value="users" className="space-y-6">
-              {/* Search and Filter */}
               <Card className="p-6 bg-card/50 backdrop-blur-xl border-border">
                 <div className="flex flex-col md:flex-row gap-4">
                   <div className="relative flex-1">
@@ -364,7 +533,6 @@ export default function AdminDashboard() {
                 </div>
               </Card>
 
-              {/* Users Table */}
               <Card className="overflow-hidden bg-card/50 backdrop-blur-xl border-border">
                 <div className="overflow-x-auto">
                   <table className="w-full">
@@ -505,33 +673,216 @@ export default function AdminDashboard() {
                   Create New Event
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input
-                    placeholder="Event Title"
-                    className="bg-background/50 border-border"
-                  />
-                  <Input
-                    type="date"
-                    className="bg-background/50 border-border"
-                  />
-                  <Input
-                    type="time"
-                    className="bg-background/50 border-border"
-                  />
-                  <Input
-                    placeholder="Location"
-                    className="bg-background/50 border-border"
-                  />
                   <div className="md:col-span-2">
+                    <label className="text-sm font-medium mb-1 block">
+                      Event Title
+                    </label>
                     <Input
-                      placeholder="Description"
+                      placeholder="Quantum Computing Workshop"
                       className="bg-background/50 border-border"
+                      value={form.title}
+                      onChange={handleFormChange('title')}
                     />
                   </div>
-                  <div className="md:col-span-2 flex gap-3">
-                    <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
+
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">
+                      Category
+                    </label>
+                    <Input
+                      placeholder="Workshop, Lecture, Hackathon..."
+                      className="bg-background/50 border-border"
+                      value={form.category}
+                      onChange={handleFormChange('category')}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">
+                      Date
+                    </label>
+                    <Input
+                      type="date"
+                      className="bg-background/50 border-border"
+                      value={form.date}
+                      onChange={handleFormChange('date')}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">
+                      Time
+                    </label>
+                    <Input
+                      placeholder="6:00 PM - 8:00 PM"
+                      className="bg-background/50 border-border"
+                      value={form.time}
+                      onChange={handleFormChange('time')}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">
+                      Location
+                    </label>
+                    <Input
+                      placeholder="Engineering Lab 201"
+                      className="bg-background/50 border-border"
+                      value={form.location}
+                      onChange={handleFormChange('location')}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">
+                      Total Spots
+                    </label>
+                    <Input
+                      type="number"
+                      placeholder="50"
+                      className="bg-background/50 border-border"
+                      value={form.spots}
+                      onChange={handleFormChange('spots')}
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-medium mb-1 block">
+                      Event Image URL
+                    </label>
+                    <Input
+                      placeholder="/quantum-computing-workshop.jpg"
+                      className="bg-background/50 border-border"
+                      value={form.image}
+                      onChange={handleFormChange('image')}
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-medium mb-1 block">
+                      Description
+                    </label>
+                    <textarea
+                      placeholder="Describe the event..."
+                      className="w-full rounded-md border border-border bg-background/50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/60"
+                      rows={3}
+                      value={form.description}
+                      onChange={handleFormChange('description')}
+                    />
+                  </div>
+
+                  {/* Organizer Info */}
+                  <div className="md:col-span-2 pt-2 border-t border-border/60">
+                    <h4 className="text-sm font-semibold mb-2">
+                      Organizer Details
+                    </h4>
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">
+                      Organizer Name
+                    </label>
+                    <Input
+                      placeholder="Abdallah Aisharrah"
+                      className="bg-background/50 border-border"
+                      value={form.organizerName}
+                      onChange={handleFormChange('organizerName')}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-sm font-medium mb-1 block">
+                      Organizer Role
+                    </label>
+                    <Input
+                      placeholder="Founder & President"
+                      className="bg-background/50 border-border"
+                      value={form.organizerRole}
+                      onChange={handleFormChange('organizerRole')}
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="text-sm font-medium mb-1 block">
+                      Organizer Avatar URL
+                    </label>
+                    <Input
+                      placeholder="/professional-man.jpg"
+                      className="bg-background/50 border-border"
+                      value={form.organizerAvatar}
+                      onChange={handleFormChange('organizerAvatar')}
+                    />
+                  </div>
+
+                  {/* Agenda */}
+                  <div className="md:col-span-2 pt-2 border-t border-border/60">
+                    <h4 className="text-sm font-semibold mb-2">Agenda</h4>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      One item per line using{' '}
+                      <span className="font-mono">time | title | duration</span>{' '}
+                      format. Example:
+                    </p>
+                    <pre className="text-xs font-mono bg-background/60 border border-dashed border-border rounded-md p-2 mb-2">
+6:00 PM | Welcome & Introduction | 15 min
+6:15 PM | Quantum Basics Overview | 30 min
+                    </pre>
+                    <textarea
+                      placeholder="6:00 PM | Welcome & Introduction | 15 min"
+                      className="w-full rounded-md border border-border bg-background/50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/60"
+                      rows={4}
+                      value={form.agendaText}
+                      onChange={handleFormChange('agendaText')}
+                    />
+                  </div>
+
+                  {/* Requirements */}
+                  <div className="md:col-span-2">
+                    <h4 className="text-sm font-semibold mb-2">
+                      Requirements
+                    </h4>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      One requirement per line (shown under &quot;What to
+                      Bring&quot;).
+                    </p>
+                    <textarea
+                      placeholder={'Laptop with Python installed\nBasic programming knowledge'}
+                      className="w-full rounded-md border border-border bg-background/50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/60"
+                      rows={3}
+                      value={form.requirementsText}
+                      onChange={handleFormChange('requirementsText')}
+                    />
+                  </div>
+
+                  <div className="md:col-span-2 flex gap-3 pt-2">
+                    <Button
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                      onClick={handleCreateEvent}
+                    >
                       Create Event
                     </Button>
-                    <Button variant="outline">Save as Draft</Button>
+                    <Button
+                      variant="outline"
+                      type="button"
+                      onClick={() =>
+                        setForm({
+                          title: '',
+                          category: '',
+                          date: '',
+                          time: '',
+                          location: '',
+                          spots: '',
+                          image: '',
+                          description: '',
+                          organizerName: '',
+                          organizerRole: '',
+                          organizerAvatar: '',
+                          agendaText: '',
+                          requirementsText: '',
+                        })
+                      }
+                    >
+                      Clear Form
+                    </Button>
                   </div>
                 </div>
               </Card>
@@ -573,6 +924,11 @@ export default function AdminDashboard() {
                             >
                               {event.status}
                             </Badge>
+                            {event.category && (
+                              <Badge variant="outline">
+                                {event.category}
+                              </Badge>
+                            )}
                           </div>
                           <div className="flex flex-wrap gap-4 text-sm text-foreground/60">
                             <span className="flex items-center gap-1">
@@ -591,7 +947,6 @@ export default function AdminDashboard() {
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          {/* 🔗 View -> member event detail */}
                           <Link href={`/member/events/${event.id}`}>
                             <Button
                               size="sm"
@@ -614,6 +969,11 @@ export default function AdminDashboard() {
                             size="sm"
                             variant="outline"
                             className="gap-2 hover:text-destructive hover:border-destructive bg-transparent"
+                            onClick={() =>
+                              setEvents((prev) =>
+                                prev.filter((e) => e.id !== event.id),
+                              )
+                            }
                           >
                             <Trash2 className="h-4 w-4" />
                             Delete
