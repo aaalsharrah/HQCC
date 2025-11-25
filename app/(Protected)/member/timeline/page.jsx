@@ -128,7 +128,7 @@ export default function FeedPage() {
       <main className="max-w-4xl mx-auto px-4 pt-28 pb-20">
         {/* Page header */}
         <div className="mb-8">
-          <h1 className="text-4xl md:text-5xl font-bold mb-3 bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+          <h1 className="text-4xl md:text-5xl font-bold mb-3 bg-linear-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
             Community Feed
           </h1>
           <p className="text-muted-foreground text-lg">
@@ -159,7 +159,7 @@ export default function FeedPage() {
                     : 'Log in to share your quantum thoughts...'
                 }
                 disabled={!currentUser || posting}
-                className="w-full bg-transparent border-none outline-none resize-none text-foreground placeholder:text-muted-foreground min-h-[80px]"
+                className="w-full bg-transparent border-none outline-none resize-none text-foreground placeholder:text-muted-foreground min-h-20"
               />
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/50">
                 <Button

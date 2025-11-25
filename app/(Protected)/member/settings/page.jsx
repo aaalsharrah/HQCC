@@ -860,7 +860,7 @@ export default function SettingsPage() {
                           : 'border-border/50 hover:border-primary/50'
                       }`}
                     >
-                      <div className="w-full h-20 rounded bg-gradient-to-r from-white to-slate-950 mb-2" />
+                      <div className="w-full h-20 rounded bg-linear-to-r from-white to-slate-950 mb-2" />
                       <p className="text-sm font-medium">Auto</p>
                     </button>
                   </div>
@@ -916,7 +916,7 @@ export default function SettingsPage() {
                           : 'border-border/50 hover:border-primary/50'
                       }`}
                     >
-                      <div className="w-full h-20 rounded bg-gradient-to-br from-cyan-500 to-blue-600 mb-2" />
+                      <div className="w-full h-20 rounded bg-linear-to-br from-cyan-500 to-blue-600 mb-2" />
                       <p className="text-sm font-medium">Quantum</p>
                     </button>
                     <button
@@ -932,7 +932,7 @@ export default function SettingsPage() {
                           : 'border-border/50 hover:border-primary/50'
                       }`}
                     >
-                      <div className="w-full h-20 rounded bg-gradient-to-br from-purple-500 to-pink-600 mb-2" />
+                      <div className="w-full h-20 rounded bg-linear-to-br from-purple-500 to-pink-600 mb-2" />
                       <p className="text-sm font-medium">Nebula</p>
                     </button>
                     <button
@@ -948,7 +948,7 @@ export default function SettingsPage() {
                           : 'border-border/50 hover:border-primary/50'
                       }`}
                     >
-                      <div className="w-full h-20 rounded bg-gradient-to-br from-green-500 to-teal-600 mb-2" />
+                      <div className="w-full h-20 rounded bg-linear-to-br from-green-500 to-teal-600 mb-2" />
                       <p className="text-sm font-medium">Aurora</p>
                     </button>
                   </div>

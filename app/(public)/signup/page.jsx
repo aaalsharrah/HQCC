@@ -189,7 +189,7 @@ export default function SignUpPage() {
         <div className="bg-card/80 backdrop-blur-xl border border-border rounded-2xl p-8 shadow-2xl">
           <div className="text-center mb-8">
             <div className="inline-block mb-4">
-              <div className="w-16 h-16 bg-gradient-to-br from-primary via-accent to-secondary rounded-2xl flex items-center justify-center">
+              <div className="w-16 h-16 bg-linear-to-br from-primary via-accent to-secondary rounded-2xl flex items-center justify-center">
                 <span className="text-2xl font-bold text-white">HQ</span>
               </div>
             </div>
@@ -351,7 +351,7 @@ export default function SignUpPage() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full h-12 bg-gradient-to-r from-primary via-accent to-secondary hover:opacity-90 text-white font-medium text-base transition-all disabled:opacity-60"
+              className="w-full h-12 bg-linear-to-r from-primary via-accent to-secondary hover:opacity-90 text-white font-medium text-base transition-all disabled:opacity-60"
             >
               {loading ? 'Creating account...' : 'Create Account'}
             </Button>

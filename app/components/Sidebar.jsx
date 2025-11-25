@@ -120,7 +120,7 @@ export default function Sidebar({ collapsed, onToggle }) {
       {/* TOP */}
       <div className="flex items-center justify-between px-4 py-4 border-b border-border">
         {!collapsed && (
-          <span className="font-bold text-lg bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+          <span className="font-bold text-lg bg-linear-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
             HQCC
           </span>
         )}

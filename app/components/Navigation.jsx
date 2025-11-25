@@ -38,7 +38,7 @@ export function Navigation() {
             href="/"
             className="text-2xl font-bold tracking-tight transition-colors hover:text-primary"
           >
-            <span className="bg-gradient-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
+            <span className="bg-linear-to-r from-primary via-accent to-secondary bg-clip-text text-transparent">
               HQCC
             </span>
           </Link>
