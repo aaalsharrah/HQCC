@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Calendar,
@@ -14,195 +15,91 @@ import {
   X,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useState, use } from 'react';
+import { db } from '@/app/lib/firebase/firebase';
+import { doc, getDoc, Timestamp } from 'firebase/firestore';
 
-// Event data (in production, this would come from a database)
-const eventsData = {
-  1: {
-    id: 1,
-    title: 'Quantum Computing Workshop',
-    date: '2024-02-15',
-    time: '6:00 PM - 8:00 PM',
-    location: 'Engineering Lab 201',
-    attendees: 45,
-    category: 'Workshop',
-    description:
-      "Join us for an intensive hands-on workshop where you'll learn the fundamentals of quantum algorithms and circuit design using Qiskit. This workshop is perfect for beginners and intermediate learners looking to expand their quantum computing knowledge.",
-    image: '/quantum-computing-workshop.jpg',
-    spots: 50,
-    organizer: {
-      name: 'Abdallah Aisharrah',
-      role: 'Founder & President',
-      avatar: '/professional-man.jpg',
-    },
-    agenda: [
-      { time: '6:00 PM', title: 'Welcome & Introduction', duration: '15 min' },
-      { time: '6:15 PM', title: 'Quantum Basics Overview', duration: '30 min' },
-      {
-        time: '6:45 PM',
-        title: 'Hands-on Qiskit Tutorial',
-        duration: '45 min',
-      },
-      {
-        time: '7:30 PM',
-        title: 'Build Your First Circuit',
-        duration: '20 min',
-      },
-      { time: '7:50 PM', title: 'Q&A Session', duration: '10 min' },
-    ],
-    requirements: [
-      'Laptop with Python installed',
-      'Basic programming knowledge',
-      'Qiskit installed (installation guide will be sent)',
-      'Curiosity and enthusiasm!',
-    ],
-    attendeesList: [
-      {
-        name: 'Sarah Chen',
-        avatar: '/serene-asian-woman.png',
-        role: 'CS Senior',
-      },
-      {
-        name: 'Marcus Johnson',
-        avatar: '/thoughtful-man.png',
-        role: 'Physics Junior',
-      },
-      {
-        name: 'Emily Rodriguez',
-        avatar: '/confident-latina-woman.png',
-        role: 'Math Sophomore',
-      },
-      {
-        name: 'David Kim',
-        avatar: '/thoughtful-asian-man.png',
-        role: 'CS Junior',
-      },
-      {
-        name: 'Jessica Taylor',
-        avatar: '/woman-student.png',
-        role: 'Engineering Senior',
-      },
-      {
-        name: 'Alex Martinez',
-        avatar: '/man-student.png',
-        role: 'Physics Sophomore',
-      },
-    ],
-  },
-  2: {
-    id: 2,
-    title: 'Guest Lecture: IBM Quantum',
-    date: '2024-02-22',
-    time: '7:00 PM - 9:00 PM',
-    location: 'Auditorium Hall A',
-    attendees: 120,
-    category: 'Lecture',
-    description:
-      'An exclusive lecture from a leading researcher at IBM Quantum discussing the latest breakthroughs in quantum computing, real-world applications, and the future trajectory of the field. This is a rare opportunity to learn from industry pioneers.',
-    image: '/quantum-lecture-hall.jpg',
-    spots: 150,
-    organizer: {
-      name: 'Abdallah Aisharrah',
-      role: 'Founder & President',
-      avatar: '/professional-man.jpg',
-    },
-    agenda: [
-      { time: '7:00 PM', title: 'Introduction & Welcome', duration: '10 min' },
-      { time: '7:10 PM', title: 'IBM Quantum Overview', duration: '30 min' },
-      { time: '7:40 PM', title: 'Recent Breakthroughs', duration: '40 min' },
-      { time: '8:20 PM', title: 'Industry Applications', duration: '20 min' },
-      { time: '8:40 PM', title: 'Q&A with Speaker', duration: '20 min' },
-    ],
-    requirements: [
-      'No prerequisites required',
-      'Bring your questions!',
-      'Business casual attire recommended',
-    ],
-    attendeesList: [
-      {
-        name: 'Sarah Chen',
-        avatar: '/serene-asian-woman.png',
-        role: 'CS Senior',
-      },
-      {
-        name: 'Marcus Johnson',
-        avatar: '/thoughtful-man.png',
-        role: 'Physics Junior',
-      },
-      {
-        name: 'Emily Rodriguez',
-        avatar: '/confident-latina-woman.png',
-        role: 'Math Sophomore',
-      },
-      {
-        name: 'David Kim',
-        avatar: '/thoughtful-asian-man.png',
-        role: 'CS Junior',
-      },
-    ],
-  },
-  3: {
-    id: 3,
-    title: 'Quantum Hackathon 2024',
-    date: '2024-03-10',
-    time: '9:00 AM - 6:00 PM',
-    location: 'Computer Science Building',
-    attendees: 80,
-    category: 'Hackathon',
-    description:
-      '24-hour quantum computing hackathon with prizes, mentorship, and team-based challenges focused on real-world quantum applications.',
-    image: '/hackathon-coding.jpg',
-    spots: 100,
-    organizer: {
-      name: 'Abdallah Aisharrah',
-      role: 'Founder & President',
-      avatar: '/professional-man.jpg',
-    },
-    agenda: [
-      { time: '9:00 AM', title: 'Check-in & Breakfast', duration: '60 min' },
-      { time: '10:00 AM', title: 'Kickoff & Rules', duration: '30 min' },
-      { time: '10:30 AM', title: 'Team Formation & Ideation', duration: '60 min' },
-      { time: '11:30 AM', title: 'Hacking Session', duration: '5 hrs' },
-      { time: '4:30 PM', title: 'Project Demos', duration: '60 min' },
-      { time: '5:30 PM', title: 'Judging & Awards', duration: '30 min' },
-    ],
-    requirements: [
-      'Laptop with development tools installed',
-      'GitHub account',
-      'Basic programming experience',
-      'Interest in quantum computing and problem solving',
-    ],
-    attendeesList: [
-      {
-        name: 'Sarah Chen',
-        avatar: '/serene-asian-woman.png',
-        role: 'CS Senior',
-      },
-      {
-        name: 'Marcus Johnson',
-        avatar: '/thoughtful-man.png',
-        role: 'Physics Junior',
-      },
-      {
-        name: 'Emily Rodriguez',
-        avatar: '/confident-latina-woman.png',
-        role: 'Math Sophomore',
-      },
-      {
-        name: 'David Kim',
-        avatar: '/thoughtful-asian-man.png',
-        role: 'CS Junior',
-      },
-    ],
-  },
-};
+// If you’re using output: 'export' you can keep this:
+export const dynamicParams = true;
+
+// Helper to parse Firestore / string dates
+function parseEventDate(dateField) {
+  if (!dateField) return null;
+  if (dateField instanceof Timestamp) return dateField.toDate();
+  if (dateField?.toDate) return dateField.toDate();
+  if (typeof dateField === 'string') return new Date(dateField);
+  return null;
+}
 
 export default function EventDetailPage(props) {
-  const params = use(props.params);
-  // params.id is a string ('1', '2', '3') – JS will coerce it to the right key
-  const event = eventsData[params.id];
+  const { id } = props.params; // 'id' from /member/events/[id]
+  const [event, setEvent] = useState(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [showRSVP, setShowRSVP] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchEvent() {
+      try {
+        setLoading(true);
+        const ref = doc(db, 'events', id);
+        const snap = await getDoc(ref);
+
+        if (!snap.exists()) {
+          setEvent(null);
+          return;
+        }
+
+        const data = snap.data();
+
+        const eventDate = parseEventDate(data.date);
+
+        // Fallbacks so UI doesn’t break if fields are missing
+        const safeEvent = {
+          id,
+          title: data.title || 'Untitled Event',
+          date: eventDate,
+          time: data.time || '',
+          location: data.location || '',
+          attendees: data.attendees || 0,
+          category: data.category || 'Event',
+          description: data.description || '',
+          image: data.image || '/placeholder.svg',
+          spots: data.spots || 0,
+          organizer: data.organizer || {
+            name: 'HQCC',
+            role: 'Organizer',
+            avatar: '/placeholder.svg',
+          },
+          agenda: data.agenda || [],
+          requirements: data.requirements || [],
+          attendeesList: data.attendeesList || [],
+        };
+
+        setEvent(safeEvent);
+      } catch (err) {
+        console.error('Error loading event detail:', err);
+        setEvent(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchEvent();
+  }, [id]);
+
+  const handleRSVP = () => {
+    // later you’ll write Firestore registration logic here
+    setIsRegistered(true);
+    setShowRSVP(false);
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <p className="text-muted-foreground">Loading event...</p>
+      </div>
+    );
+  }
 
   if (!event) {
     return (
@@ -217,10 +114,10 @@ export default function EventDetailPage(props) {
     );
   }
 
-  const handleRSVP = () => {
-    setIsRegistered(true);
-    setShowRSVP(false);
-  };
+  const availableSpots =
+    event.spots && event.attendees
+      ? event.spots - event.attendees
+      : event.spots || 0;
 
   return (
     <div className="min-h-screen bg-background">
@@ -259,22 +156,28 @@ export default function EventDetailPage(props) {
                 <div className="flex items-center gap-2">
                   <Calendar className="w-5 h-5 text-primary" />
                   <span>
-                    {new Date(event.date).toLocaleDateString('en-US', {
-                      weekday: 'long',
-                      month: 'long',
-                      day: 'numeric',
-                      year: 'numeric',
-                    })}
+                    {event.date
+                      ? event.date.toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          month: 'long',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })
+                      : 'Date TBA'}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-accent" />
-                  <span>{event.time}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-5 h-5 text-secondary" />
-                  <span>{event.location}</span>
-                </div>
+                {event.time && (
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-accent" />
+                    <span>{event.time}</span>
+                  </div>
+                )}
+                {event.location && (
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-5 h-5 text-secondary" />
+                    <span>{event.location}</span>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -293,53 +196,57 @@ export default function EventDetailPage(props) {
               </div>
 
               {/* Agenda */}
-              <div className="bg-card/50 backdrop-blur-sm border border-border rounded-2xl p-8">
-                <h2 className="text-2xl font-bold mb-6 text-foreground">
-                  Event Agenda
-                </h2>
-                <div className="space-y-4">
-                  {event.agenda.map((item, index) => (
-                    <div key={index} className="flex gap-4 group">
-                      <div className="flex flex-col items-center">
-                        <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center border-2 border-primary group-hover:bg-primary/30 transition-colors">
-                          <Clock className="w-5 h-5 text-primary" />
+              {event.agenda && event.agenda.length > 0 && (
+                <div className="bg-card/50 backdrop-blur-sm border border-border rounded-2xl p-8">
+                  <h2 className="text-2xl font-bold mb-6 text-foreground">
+                    Event Agenda
+                  </h2>
+                  <div className="space-y-4">
+                    {event.agenda.map((item, index) => (
+                      <div key={index} className="flex gap-4 group">
+                        <div className="flex flex-col items-center">
+                          <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center border-2 border-primary group-hover:bg-primary/30 transition-colors">
+                            <Clock className="w-5 h-5 text-primary" />
+                          </div>
+                          {index < event.agenda.length - 1 && (
+                            <div className="w-0.5 h-full bg-border group-hover:bg-primary/50 transition-colors mt-2" />
+                          )}
                         </div>
-                        {index < event.agenda.length - 1 && (
-                          <div className="w-0.5 h-full bg-border group-hover:bg-primary/50 transition-colors mt-2" />
-                        )}
-                      </div>
-                      <div className="flex-1 pb-6">
-                        <div className="flex justify-between items-start mb-1">
-                          <h3 className="font-semibold text-foreground">
-                            {item.title}
-                          </h3>
-                          <span className="text-sm text-muted-foreground">
-                            {item.duration}
-                          </span>
+                        <div className="flex-1 pb-6">
+                          <div className="flex justify-between items-start mb-1">
+                            <h3 className="font-semibold text-foreground">
+                              {item.title}
+                            </h3>
+                            <span className="text-sm text-muted-foreground">
+                              {item.duration}
+                            </span>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {item.time}
+                          </p>
                         </div>
-                        <p className="text-sm text-muted-foreground">
-                          {item.time}
-                        </p>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Requirements */}
-              <div className="bg-card/50 backdrop-blur-sm border border-border rounded-2xl p-8">
-                <h2 className="text-2xl font-bold mb-6 text-foreground">
-                  What to Bring
-                </h2>
-                <ul className="space-y-3">
-                  {event.requirements.map((req, index) => (
-                    <li key={index} className="flex items-start gap-3">
-                      <CheckCircle className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
-                      <span className="text-muted-foreground">{req}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+              {event.requirements && event.requirements.length > 0 && (
+                <div className="bg-card/50 backdrop-blur-sm border border-border rounded-2xl p-8">
+                  <h2 className="text-2xl font-bold mb-6 text-foreground">
+                    What to Bring
+                  </h2>
+                  <ul className="space-y-3">
+                    {event.requirements.map((req, index) => (
+                      <li key={index} className="flex items-start gap-3">
+                        <CheckCircle className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
+                        <span className="text-muted-foreground">{req}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
 
               {/* Attendees */}
               <div className="bg-card/50 backdrop-blur-sm border border-border rounded-2xl p-8">
@@ -347,7 +254,7 @@ export default function EventDetailPage(props) {
                   Who&apos;s Coming ({event.attendees})
                 </h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                  {event.attendeesList.map((attendee, index) => (
+                  {(event.attendeesList || []).map((attendee, index) => (
                     <div
                       key={index}
                       className="flex items-center gap-3 p-3 rounded-xl bg-background/50 border border-border hover:border-primary/50 transition-colors"
@@ -367,13 +274,6 @@ export default function EventDetailPage(props) {
                       </div>
                     </div>
                   ))}
-                  {event.attendees > event.attendeesList.length && (
-                    <div className="flex items-center justify-center p-3 rounded-xl bg-background/50 border border-border">
-                      <span className="text-sm text-muted-foreground">
-                        +{event.attendees - event.attendeesList.length} more
-                      </span>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -389,7 +289,7 @@ export default function EventDetailPage(props) {
                         Available Spots
                       </p>
                       <p className="text-2xl font-bold text-foreground">
-                        {event.spots - event.attendees} / {event.spots}
+                        {availableSpots} / {event.spots}
                       </p>
                     </div>
                     <Users className="w-8 h-8 text-primary" />
@@ -399,7 +299,10 @@ export default function EventDetailPage(props) {
                     <div
                       className="bg-gradient-to-r from-primary to-accent h-full transition-all duration-500"
                       style={{
-                        width: `${(event.attendees / event.spots) * 100}%`,
+                        width:
+                          event.spots > 0
+                            ? `${(event.attendees / event.spots) * 100}%`
+                            : '0%',
                       }}
                     />
                   </div>
@@ -486,7 +389,7 @@ export default function EventDetailPage(props) {
                   <MapPin className="w-12 h-12 text-muted-foreground" />
                 </div>
                 <p className="text-sm text-muted-foreground mb-2">
-                  {event.location}
+                  {event.location || 'Location TBA'}
                 </p>
                 <Button
                   variant="outline"
@@ -524,21 +427,28 @@ export default function EventDetailPage(props) {
               <div className="flex items-center gap-3 text-sm">
                 <Calendar className="w-5 h-5 text-primary" />
                 <span className="text-foreground">
-                  {new Date(event.date).toLocaleDateString('en-US', {
-                    weekday: 'long',
-                    month: 'long',
-                    day: 'numeric',
-                  })}
+                  {event.date
+                    ? event.date.toLocaleDateString('en-US', {
+                        weekday: 'long',
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })
+                    : 'Date TBA'}
                 </span>
               </div>
-              <div className="flex items-center gap-3 text-sm">
-                <Clock className="w-5 h-5 text-accent" />
-                <span className="text-foreground">{event.time}</span>
-              </div>
-              <div className="flex items-center gap-3 text-sm">
-                <MapPin className="w-5 h-5 text-secondary" />
-                <span className="text-foreground">{event.location}</span>
-              </div>
+              {event.time && (
+                <div className="flex items-center gap-3 text-sm">
+                  <Clock className="w-5 h-5 text-accent" />
+                  <span className="text-foreground">{event.time}</span>
+                </div>
+              )}
+              {event.location && (
+                <div className="flex items-center gap-3 text-sm">
+                  <MapPin className="w-5 h-5 text-secondary" />
+                  <span className="text-foreground">{event.location}</span>
+                </div>
+              )}
             </div>
             <div className="flex gap-3">
               <Button

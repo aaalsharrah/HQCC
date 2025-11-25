@@ -10,6 +10,7 @@ import {
   Linkedin,
   Github,
   Loader2,
+  GraduationCap,
 } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
