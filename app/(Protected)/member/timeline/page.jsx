@@ -324,7 +324,7 @@ export default function FeedPage() {
                     />
                   </div>
                 ) : null}
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
+
                 {/* Post actions */}
                 <div className="flex items-center justify-between pt-4 border-t border-border/50">
                   <div className="flex items-center gap-2">
