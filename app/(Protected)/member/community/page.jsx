@@ -18,13 +18,8 @@ import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { db } from '@/app/lib/firebase/firebase';
-import {
-  collection,
-  getDocs,
-  query,
-  where,
-  Timestamp,
-} from 'firebase/firestore';
+import { collection, getDocs, Timestamp } from 'firebase/firestore';
+import Image from 'next/image';
 
 // Helper function to get initials from name
 function getInitials(name) {
@@ -39,7 +34,6 @@ function getInitials(name) {
 // Helper function to parse interests from bio
 function parseInterests(bio) {
   if (!bio) return ['Quantum Computing'];
-  // Try to extract interests from bio (split by common separators)
   const separators = ['|', ',', '•', '-'];
   for (const sep of separators) {
     if (bio.includes(sep)) {
@@ -50,8 +44,23 @@ function parseInterests(bio) {
         .slice(0, 3);
     }
   }
-  // If no separators, return bio as single interest or default
   return bio.length > 30 ? ['Quantum Computing'] : [bio];
+}
+
+// Helper to prioritize leadership/admin at top
+function getRolePriority(roleRaw) {
+  const role = (roleRaw || '').toLowerCase();
+
+  if (
+    role.includes('admin') ||
+    role.includes('president') ||
+    role.includes('co-founder') ||
+    role.includes('founder')
+  )
+    return 0; // top leadership
+  if (role.includes('board')) return 1;
+  if (role.includes('vice') || role.includes('lead')) return 2;
+  return 3; // general members
 }
 
 export default function CommunityPage() {
@@ -88,36 +97,41 @@ export default function CommunityPage() {
           };
         });
 
-        // Generate avatar initials and parse interests
-        const processedMembers = membersData.map((member) => ({
-          ...member,
-          avatarInitials: getInitials(member.name),
-          interests: parseInterests(member.bio),
-        }));
+        // Generate avatar initials, parse interests & sort (admin/board first)
+        const processedMembers = membersData
+          .map((member) => ({
+            ...member,
+            avatarInitials: getInitials(member.name),
+            interests: parseInterests(member.bio),
+          }))
+          .sort((a, b) => {
+            const pa = getRolePriority(a.role);
+            const pb = getRolePriority(b.role);
+            if (pa !== pb) return pa - pb;
+            return (a.name || '').localeCompare(b.name || '');
+          });
 
         setMembers(processedMembers);
 
         // Calculate statistics
         const activeMembersCount = membersData.length;
 
-        // Count posts
+        // Posts
         const postsRef = collection(db, 'posts');
         const postsSnapshot = await getDocs(postsRef);
         const projectsCount = postsSnapshot.size;
 
-        // Count events this year
+        // Events this year
         let eventsCount = 0;
         try {
           const eventsRef = collection(db, 'events');
           const eventsSnapshot = await getDocs(eventsRef);
-          
-          // Filter events by current year
+
           const currentYear = new Date().getFullYear();
           eventsSnapshot.docs.forEach((doc) => {
             const eventData = doc.data();
             let eventDate = null;
-            
-            // Handle different date formats
+
             if (eventData.date) {
               if (eventData.date instanceof Timestamp) {
                 eventDate = eventData.date.toDate();
@@ -129,27 +143,27 @@ export default function CommunityPage() {
                 eventDate = eventData.date.toDate();
               }
             } else if (eventData.createdAt) {
-              // Fallback to createdAt if date doesn't exist
               if (eventData.createdAt instanceof Timestamp) {
                 eventDate = eventData.createdAt.toDate();
               } else if (eventData.createdAt?.toDate) {
                 eventDate = eventData.createdAt.toDate();
               }
             }
-            
+
             if (eventDate && eventDate.getFullYear() === currentYear) {
               eventsCount++;
             }
           });
         } catch (error) {
           console.error('Error counting events:', error);
-          // Default to 0 if query fails
           eventsCount = 0;
         }
 
-        // Calculate growth rate
+        // Growth rate
         const now = new Date();
-        const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        const thirtyDaysAgo = new Date(
+          now.getTime() - 30 * 24 * 60 * 60 * 1000
+        );
         const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
 
         const recentMembers = membersData.filter((m) => {
@@ -212,6 +226,7 @@ export default function CommunityPage() {
 
     fetchData();
   }, []);
+
   return (
     <div className="relative min-h-screen bg-background">
       {/* Background Effects */}
@@ -300,17 +315,20 @@ export default function CommunityPage() {
               {members.map((member) => (
                 <Card
                   key={member.id}
-                  className="relative group p-6 bg-card/50 backdrop-blur-xl border-border hover:border-primary/50 transition-all duration-300 hover:transform hover:scale-[1.02] cursor-pointer"
+                  className="relative group p-6 bg-card/50 backdrop-blur-xl border-border hover:border-primary/50 transition-all duration-300 hover:transform hover:scale-[1.02] cursor-pointer flex flex-col"
                   onClick={() => router.push(`/member/profile/${member.id}`)}
                 >
-                  {/* Avatar */}
+                  {/* Avatar + top content */}
                   <div className="flex flex-col items-center mb-4">
                     <div className="relative mb-4">
                       {member.avatar ? (
-                        <img
+                        <Image
                           src={member.avatar}
                           alt={member.name}
+                          width={80}
+                          height={80}
                           className="w-20 h-20 rounded-full object-cover border-2 border-primary/20"
+                          unoptimized={member.avatar.startsWith('http')}
                         />
                       ) : (
                         <div className="w-20 h-20 rounded-full bg-linear-to-br from-primary via-accent to-secondary flex items-center justify-center text-2xl font-bold text-primary-foreground">
@@ -320,16 +338,20 @@ export default function CommunityPage() {
                       <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-green-500 border-2 border-card" />
                     </div>
 
-                    <h3 className="text-lg font-bold text-center mb-1">
+                    <h3 className="text-lg font-bold text-center mb-1 line-clamp-2">
                       {member.name}
                     </h3>
-                    <Badge variant="secondary" className="mb-2">
+
+                    <Badge
+                      variant="secondary"
+                      className="mb-2 text-center line-clamp-2"
+                    >
                       {member.role}
                     </Badge>
 
                     {member.major && (
-                      <div className="flex items-center gap-1 text-sm text-foreground/60 mb-1">
-                        <GraduationCap className="h-3 w-3" />
+                      <div className="flex items-center gap-1 text-sm text-foreground/60 mb-1 line-clamp-2">
+                        <GraduationCap className="h-3 w-3 flex-shrink-0" />
                         <span>{member.major}</span>
                       </div>
                     )}
@@ -342,9 +364,13 @@ export default function CommunityPage() {
 
                   {/* Interests */}
                   {member.interests && member.interests.length > 0 && (
-                    <div className="flex flex-wrap gap-1.5 mb-4 justify-center">
+                    <div className="flex flex-col gap-2 mb-4 items-center px-1 w-full">
                       {member.interests.map((interest, i) => (
-                        <Badge key={i} variant="outline" className="text-xs">
+                        <Badge
+                          key={i}
+                          variant="outline"
+                          className="text-xs px-3 py-1 line-clamp-2 max-w-[240px] whitespace-normal break-words text-center"
+                        >
                           {interest}
                         </Badge>
                       ))}
@@ -352,56 +378,58 @@ export default function CommunityPage() {
                   )}
 
                   {/* Social Links */}
-                  <div 
-                    className="flex gap-2 justify-center pt-4 border-t border-border/50"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    {member.email && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 hover:text-primary"
-                        asChild
-                      >
-                        <a href={`mailto:${member.email}`} aria-label="Email">
-                          <Mail className="h-4 w-4" />
-                        </a>
-                      </Button>
-                    )}
-                    {member.linkedin && member.linkedin !== '#' && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 hover:text-primary"
-                        asChild
-                      >
-                        <a
-                          href={member.linkedin}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label="LinkedIn"
+                  <div className="mt-auto">
+                    <div
+                      className="flex gap-2 justify-center pt-4 border-t border-border/50"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {member.email && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 hover:text-primary"
+                          asChild
                         >
-                          <Linkedin className="h-4 w-4" />
-                        </a>
-                      </Button>
-                    )}
-                    {member.github && member.github !== '#' && (
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8 hover:text-primary"
-                        asChild
-                      >
-                        <a
-                          href={member.github}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          aria-label="GitHub"
+                          <a href={`mailto:${member.email}`} aria-label="Email">
+                            <Mail className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      )}
+                      {member.linkedin && member.linkedin !== '#' && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 hover:text-primary"
+                          asChild
                         >
-                          <Github className="h-4 w-4" />
-                        </a>
-                      </Button>
-                    )}
+                          <a
+                            href={member.linkedin}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="LinkedIn"
+                          >
+                            <Linkedin className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      )}
+                      {member.github && member.github !== '#' && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 hover:text-primary"
+                          asChild
+                        >
+                          <a
+                            href={member.github}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="GitHub"
+                          >
+                            <Github className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      )}
+                    </div>
                   </div>
                 </Card>
               ))}
