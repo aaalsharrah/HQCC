@@ -1,10 +1,6 @@
 'use client';
 
-<<<<<<< HEAD
 import { useEffect, useState, useRef } from 'react';
-=======
-import { useEffect, useState } from 'react';
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
 import Link from 'next/link';
 
 import { Button } from '@/components/ui/button';
@@ -17,19 +13,12 @@ import {
   Bookmark,
   ImageIcon,
   Send,
-<<<<<<< HEAD
   X,
 } from 'lucide-react';
 
 import { auth, storage } from '@/app/lib/firebase/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-=======
-} from 'lucide-react';
-
-import { auth } from '@/app/lib/firebase/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
 
 import {
   createPost,
@@ -43,52 +32,9 @@ export default function FeedPage() {
   const [currentUser, setCurrentUser] = useState(null);
   const [loadingPosts, setLoadingPosts] = useState(true);
   const [posting, setPosting] = useState(false);
-<<<<<<< HEAD
   const [postImage, setPostImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const fileInputRef = useRef(null);
-=======
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
-
-  // Get current user
-  useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user || null);
-    });
-
-    return () => unsubAuth();
-  }, []);
-
-  // Subscribe to posts in real-time
-  useEffect(() => {
-<<<<<<< HEAD
-    if (!currentUser) return;
-
-    const unsubPosts = subscribeToPosts(
-      (fetchedPosts) => {
-        // Debug: Log posts with images
-        fetchedPosts.forEach((post) => {
-          if (post.imageUrl) {
-            console.log('Post with image:', post.id, 'imageUrl:', post.imageUrl);
-          }
-        });
-        setPosts(fetchedPosts);
-        setLoadingPosts(false);
-      },
-      currentUser.uid
-    );
-
-    return () => unsubPosts();
-  }, [currentUser]);
-=======
-    const unsubPosts = subscribeToPosts((fetchedPosts) => {
-      setPosts(fetchedPosts);
-      setLoadingPosts(false);
-    });
-
-    return () => unsubPosts();
-  }, []);
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
 
   const handleLike = async (postId) => {
     if (!currentUser) {
@@ -130,7 +76,6 @@ export default function FeedPage() {
     );
   };
 
-<<<<<<< HEAD
   const handleImageSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -167,10 +112,6 @@ export default function FeedPage() {
 
   const handlePost = async () => {
     if (!newPost.trim() && !postImage) return;
-=======
-  const handlePost = async () => {
-    if (!newPost.trim()) return;
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
     if (!currentUser) {
       alert('You must be logged in to post.');
       return;
@@ -178,7 +119,6 @@ export default function FeedPage() {
 
     try {
       setPosting(true);
-<<<<<<< HEAD
 
       let imageUrl = null;
 
@@ -210,14 +150,6 @@ export default function FeedPage() {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-=======
-      await createPost({
-        content: newPost.trim(),
-        user: currentUser,
-      });
-
-      setNewPost('');
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
       // subscribeToPosts will pick it up
     } catch (err) {
       console.error('Error creating post:', err);
@@ -274,7 +206,6 @@ export default function FeedPage() {
                 disabled={!currentUser || posting}
                 className="w-full bg-transparent border-none outline-none resize-none text-foreground placeholder:text-muted-foreground min-h-20"
               />
-<<<<<<< HEAD
               
               {/* Image Preview */}
               {imagePreview && (
@@ -317,17 +248,6 @@ export default function FeedPage() {
                     <ImageIcon className="h-5 w-5" />
                   </Button>
                 </div>
-=======
-              <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/50">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled
-                  className="text-muted-foreground hover:text-primary"
-                >
-                  <ImageIcon className="h-5 w-5" />
-                </Button>
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
                 <Button
                   onClick={handlePost}
                   disabled={!newPost.trim() || !currentUser || posting}

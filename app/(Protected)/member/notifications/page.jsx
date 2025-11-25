@@ -1,6 +1,5 @@
 'use client';
 
-<<<<<<< HEAD
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -99,35 +98,12 @@ export default function NotificationsPage() {
     } finally {
       setMarkingAsRead(false);
     }
-=======
-import { useState } from 'react';
-
-import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Settings, CheckCheck } from 'lucide-react';
-
-// IMPORT DATA + ICONS
-import { notificationsData, getNotificationIcon } from './data';
-
-export default function NotificationsPage() {
-  const [filter, setFilter] = useState('all');
-  const [notifications, setNotifications] = useState(notificationsData);
-
-  const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
   };
 
   const filteredNotifications = notifications.filter((n) => {
     if (filter === 'all') return true;
-<<<<<<< HEAD
     if (filter === 'replies') return n.type === 'reply';
     if (filter === 'likes') return n.type === 'like';
-=======
-    if (filter === 'mentions') return n.type === 'mention';
-    if (filter === 'likes') return n.type === 'like';
-    if (filter === 'follows') return n.type === 'follow';
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
     return true;
   });
 
@@ -157,7 +133,6 @@ export default function NotificationsPage() {
                   variant="outline"
                   size="sm"
                   onClick={markAllAsRead}
-<<<<<<< HEAD
                   disabled={unreadCount === 0 || markingAsRead}
                 >
                   {markingAsRead ? (
@@ -165,11 +140,6 @@ export default function NotificationsPage() {
                   ) : (
                     <CheckCheck className="h-4 w-4 mr-2" />
                   )}
-=======
-                  disabled={unreadCount === 0}
-                >
-                  <CheckCheck className="h-4 w-4 mr-2" />
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
                   Mark all read
                 </Button>
 
@@ -185,14 +155,8 @@ export default function NotificationsPage() {
             <div className="flex gap-2 p-1 bg-card/50 backdrop-blur-xl rounded-lg border border-border">
               {[
                 { label: 'All', value: 'all' },
-<<<<<<< HEAD
                 { label: 'Replies', value: 'replies' },
                 { label: 'Likes', value: 'likes' },
-=======
-                { label: 'Mentions', value: 'mentions' },
-                { label: 'Likes', value: 'likes' },
-                { label: 'Follows', value: 'follows' },
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
               ].map((tab) => (
                 <button
                   key={tab.value}
@@ -211,16 +175,12 @@ export default function NotificationsPage() {
 
           {/* NOTIFICATION LIST */}
           <div className="space-y-2">
-<<<<<<< HEAD
             {loading ? (
               <div className="flex justify-center items-center py-16">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
               </div>
             ) : (
               filteredNotifications.map((notification) => (
-=======
-            {filteredNotifications.map((notification) => (
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
               <div
                 key={notification.id}
                 className={`group relative bg-card/50 backdrop-blur-xl rounded-xl p-5 border transition-all hover:bg-card/70 hover:shadow-lg hover:scale-[1.01] ${
@@ -270,7 +230,6 @@ export default function NotificationsPage() {
                             </p>
                           </div>
                         )}
-<<<<<<< HEAD
                         
                         {/* Click handler to navigate to relevant page */}
                         {notification.postId && (
@@ -289,26 +248,6 @@ export default function NotificationsPage() {
                             View {notification.type === 'event' ? 'event' : notification.type === 'message' ? 'conversation' : 'post'}
                           </button>
                         )}
-=======
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* UNREAD DOT */}
-                  {!notification.read && (
-                    <div className="shrink-0">
-                      <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                    </div>
-                  )}
-                </div>
-              </div>
-<<<<<<< HEAD
-            ))
-            )}
-=======
-            ))}
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
           </div>
 
           {/* EMPTY STATE */}

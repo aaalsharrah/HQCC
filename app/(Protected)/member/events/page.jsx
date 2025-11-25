@@ -1,7 +1,6 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-<<<<<<< HEAD
 import { Calendar, Clock, MapPin, Users, ArrowRight, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
@@ -196,123 +195,6 @@ export default function EventsPage() {
     fetchEvents();
   }, []);
 
-=======
-import { Calendar, Clock, MapPin, Users, ArrowRight } from 'lucide-react';
-import Image from 'next/image';
-import { useState } from 'react';
-import Link from 'next/link';
-
-const upcomingEvents = [
-  {
-    id: 1,
-    title: 'Quantum Computing Workshop',
-    date: '2024-02-15',
-    time: '6:00 PM - 8:00 PM',
-    location: 'Engineering Lab 201',
-    attendees: 45,
-    category: 'Workshop',
-    description:
-      'Hands-on introduction to quantum algorithms and circuit design using Qiskit.',
-    image: '/quantum-computing-workshop.jpg',
-    spots: 50,
-  },
-  {
-    id: 2,
-    title: 'Guest Lecture: IBM Quantum',
-    date: '2024-02-22',
-    time: '7:00 PM - 9:00 PM',
-    location: 'Auditorium Hall A',
-    attendees: 120,
-    category: 'Lecture',
-    description:
-      'Industry leader from IBM Quantum discusses the future of quantum computing.',
-    image: '/quantum-lecture-hall.jpg',
-    spots: 150,
-  },
-  {
-    id: 3,
-    title: 'Quantum Hackathon 2024',
-    date: '2024-03-10',
-    time: '9:00 AM - 6:00 PM',
-    location: 'Computer Science Building',
-    attendees: 80,
-    category: 'Hackathon',
-    description:
-      '24-hour quantum computing hackathon with prizes and mentorship.',
-    image: '/hackathon-coding.jpg',
-    spots: 100,
-  },
-  {
-    id: 4,
-    title: 'Lab Tour: Quantum Research Facility',
-    date: '2024-03-18',
-    time: '2:00 PM - 4:00 PM',
-    location: 'Quantum Lab - Physics Building',
-    attendees: 25,
-    category: 'Tour',
-    description:
-      "Exclusive tour of the university's quantum research laboratory.",
-    image: '/quantum-laboratory.jpg',
-    spots: 30,
-  },
-];
-
-const pastEvents = [
-  {
-    id: 5,
-    title: 'Introduction to Quantum Mechanics',
-    date: '2024-01-20',
-    time: '5:00 PM - 7:00 PM',
-    location: 'Lecture Hall B',
-    attendees: 95,
-    category: 'Workshop',
-    description: 'Foundational workshop covering quantum mechanics principles.',
-    image: '/quantum-mechanics-lecture.jpg',
-    recording: true,
-  },
-  {
-    id: 6,
-    title: 'Quantum Algorithms Study Group',
-    date: '2024-01-15',
-    time: '6:00 PM - 8:00 PM',
-    location: 'Study Room 305',
-    attendees: 32,
-    category: 'Study Group',
-    description: "Weekly study session on Shor's and Grover's algorithms.",
-    image: '/study-group-quantum.jpg',
-    recording: false,
-  },
-  {
-    id: 7,
-    title: 'Meet & Greet - Fall Semester',
-    date: '2024-01-10',
-    time: '4:00 PM - 6:00 PM',
-    location: 'Student Center',
-    attendees: 68,
-    category: 'Social',
-    description:
-      'Welcome event for new members with refreshments and networking.',
-    image: '/university-meet-and-greet.jpg',
-    recording: false,
-  },
-  {
-    id: 8,
-    title: 'Quantum Cryptography Seminar',
-    date: '2023-12-15',
-    time: '7:00 PM - 9:00 PM',
-    location: 'Engineering Lab 150',
-    attendees: 56,
-    category: 'Seminar',
-    description:
-      'Deep dive into quantum key distribution and post-quantum cryptography.',
-    image: '/cryptography-security.jpg',
-    recording: true,
-  },
-];
-
-export default function EventsPage() {
-  const [activeTab, setActiveTab] = useState('upcoming');
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
   const events = activeTab === 'upcoming' ? upcomingEvents : pastEvents;
 
   return (
@@ -375,7 +257,6 @@ export default function EventsPage() {
         {/* Events Grid */}
         <section className="px-4 pb-24">
           <div className="max-w-7xl mx-auto">
-<<<<<<< HEAD
             {loading ? (
               <div className="flex justify-center items-center py-24">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -391,10 +272,6 @@ export default function EventsPage() {
             ) : (
               <div className="grid md:grid-cols-2 gap-8">
                 {events.map((event, index) => (
-=======
-            <div className="grid md:grid-cols-2 gap-8">
-              {events.map((event, index) => (
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
                 <div
                   key={event.id}
                   className="group relative bg-card/50 backdrop-blur-sm border border-border rounded-2xl overflow-hidden hover:border-primary/50 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/20"
@@ -485,14 +362,9 @@ export default function EventsPage() {
                     </div>
                   </div>
                 </div>
-<<<<<<< HEAD
                 ))}
               </div>
             )}
-=======
-              ))}
-            </div>
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
           </div>
         </section>
       </div>

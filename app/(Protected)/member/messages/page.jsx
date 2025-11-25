@@ -1,6 +1,5 @@
 'use client';
 
-<<<<<<< HEAD
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
@@ -13,21 +12,10 @@ import {
   getOtherUser,
   formatTimestamp,
 } from '@/app/lib/firebase/messages';
-=======
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Input } from '@/components/ui/input';
-
-import { Search, Send } from 'lucide-react';
-import { conversations } from './data';
-
-import Image from 'next/image';
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
 
 export default function MessagesPage() {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState('');
-<<<<<<< HEAD
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
@@ -76,17 +64,6 @@ export default function MessagesPage() {
 
     return () => unsubscribe();
   }, []);
-=======
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
-
-  const filteredConversations = conversations.filter(
-    (conv) =>
-      conv.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-<<<<<<< HEAD
-      conv.email.toLowerCase().includes(searchQuery.toLowerCase())
-=======
-      conv.username.toLowerCase().includes(searchQuery.toLowerCase())
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
   );
 
   return (
@@ -112,7 +89,6 @@ export default function MessagesPage() {
 
           {/* Conversations List */}
           <div className="flex-1 overflow-y-auto">
-<<<<<<< HEAD
             {loading ? (
               <div className="flex justify-center items-center py-8">
                 <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -163,44 +139,6 @@ export default function MessagesPage() {
                 </button>
               ))
             )}
-=======
-            {filteredConversations.map((conv) => (
-              <button
-                key={conv.id}
-                onClick={() => router.push(`/member/messages/${conv.id}`)}
-                className="w-full p-4 flex items-start gap-3 hover:bg-primary/5 transition-colors border-b border-border/50"
-              >
-                <div className="relative">
-                  <Image
-                    src={conv.avatar || '/placeholder.svg'}
-                    alt={conv.name}
-                    className="w-12 h-12 rounded-full object-cover"
-                    width={10}
-                    height={50}
-                  />
-                  {conv.online && (
-                    <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-background" />
-                  )}
-                </div>
-                <div className="flex-1 text-left">
-                  <div className="flex items-center justify-between mb-1">
-                    <h3 className="font-semibold text-sm">{conv.name}</h3>
-                    <span className="text-xs text-muted-foreground">
-                      {conv.timestamp}
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground truncate">
-                    {conv.lastMessage}
-                  </p>
-                </div>
-                {conv.unread > 0 && (
-                  <div className="mt-1 bg-primary text-primary-foreground text-xs rounded-full w-5 h-5 flex items-center justify-center">
-                    {conv.unread}
-                  </div>
-                )}
-              </button>
-            ))}
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
           </div>
         </div>
 

@@ -1,11 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-<<<<<<< HEAD
 import { useRouter, useParams } from 'next/navigation';
-=======
-import { useRouter } from 'next/navigation';
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -22,42 +18,14 @@ import {
   Calendar,
   LinkIcon,
   MoreHorizontal,
-<<<<<<< HEAD
   Send,
   Loader2,
-=======
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
-} from 'lucide-react';
-
-import { auth, db, storage } from '@/app/lib/firebase/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
-import {
-  doc,
-  getDoc,
-  collection,
-  query,
-  where,
-  orderBy,
-  getDocs,
-  setDoc,
-<<<<<<< HEAD
-  Timestamp,
-} from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { findOrCreateConversation } from '@/app/lib/firebase/messages';
-import { toggleLike } from '@/app/lib/firebase/post';
-
-=======
-} from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
 // Add this NEW helper:
 async function getReplyCount(postId) {
   const repliesRef = collection(db, 'posts', postId, 'replies');
   const snap = await getDocs(repliesRef);
   return snap.size;
 }
-<<<<<<< HEAD
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -67,13 +35,6 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
   const [likedPosts, setLikedPosts] = useState([]);
-=======
-export default function ProfilePage() {
-  const router = useRouter();
-
-  const [profile, setProfile] = useState(null);
-  const [posts, setPosts] = useState([]);
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
   const [loading, setLoading] = useState(true);
 
   const [isEditing, setIsEditing] = useState(false);
@@ -87,7 +48,6 @@ export default function ProfilePage() {
   const [avatarFile, setAvatarFile] = useState(null);
   const [coverFile, setCoverFile] = useState(null);
   const [saving, setSaving] = useState(false);
-<<<<<<< HEAD
   const [currentUserId, setCurrentUserId] = useState(null);
   const [isCurrentUserProfile, setIsCurrentUserProfile] = useState(false);
   const [sendingMessage, setSendingMessage] = useState(false);
@@ -97,20 +57,11 @@ export default function ProfilePage() {
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
-=======
-
-  const mediaPosts = posts.filter((p) => p.image);
-  const likedPosts = posts.filter((p) => p.isLiked);
-
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
       if (!user) {
         router.push('/signin');
         return;
       }
 
-<<<<<<< HEAD
       setCurrentUserId(user.uid);
       
       // Determine if viewing own profile or another user's profile
@@ -122,18 +73,11 @@ export default function ProfilePage() {
         try {
           // 🔹 Load profile from "members" - use targetUserId instead of user.uid
           const refDoc = doc(db, 'members', targetUserId);
-=======
-      (async () => {
-        try {
-          // 🔹 Load profile from "members"
-          const refDoc = doc(db, 'members', user.uid);
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
           const snap = await getDoc(refDoc);
 
           let loadedProfile;
 
           if (!snap.exists()) {
-<<<<<<< HEAD
             // If viewing another user's profile that doesn't exist, show error
             if (!isOwnProfile) {
               setProfile(null);
@@ -142,90 +86,13 @@ export default function ProfilePage() {
               return;
             }
 
-=======
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
-            const fallbackName =
-              user.displayName || user.email?.split('@')[0] || 'HQCC Member';
-            const username =
-              user.email
-                ?.split('@')[0]
-                ?.toLowerCase()
-                .replace(/[^a-z0-9]/g, '') || 'member';
-
-            loadedProfile = {
-              uid: user.uid,
-              name: fallbackName,
-              username,
-              email: user.email,
-              avatar: user.photoURL || '/quantum-computing-student.jpg',
-              coverImage:
-                '/quantum-computing-chip-with-glowing-circuits-and-b.jpg',
-              bio: 'HQCC member | Quantum & Computing Enthusiast',
-              location: 'Hempstead, NY',
-              website: 'hqcc.hofstra.edu',
-              joined: 'September 2023',
-            };
-
-            // create initial member doc
-            await setDoc(
-              refDoc,
-              {
-                name: loadedProfile.name,
-                username: loadedProfile.username,
-                email: loadedProfile.email,
-                avatar: loadedProfile.avatar,
-                coverImage: loadedProfile.coverImage,
-                bio: loadedProfile.bio,
-                location: loadedProfile.location,
-                website: loadedProfile.website,
-                createdAt: new Date(),
-              },
-              { merge: true }
-            );
-          } else {
-            const data = snap.data();
-<<<<<<< HEAD
-            
-            // Format joined date
-            let joinedDate = 'Unknown';
-            if (data.createdAt) {
-              const date = data.createdAt instanceof Timestamp
-                ? data.createdAt.toDate()
-                : data.createdAt?.toDate
-                ? data.createdAt.toDate()
-                : new Date(data.createdAt);
-              joinedDate = date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-            }
-
-            loadedProfile = {
-              uid: targetUserId,
-              name: data.name || 'HQCC Member',
-              username: data.username || 'member',
-              email: data.email || '',
-              avatar: data.avatar || '/quantum-computing-student.jpg',
-=======
-
-            loadedProfile = {
-              uid: user.uid,
-              name: data.name || 'HQCC Member',
-              username: data.username || 'member',
-              email: data.email || user.email || '',
-              avatar:
-                data.avatar ||
-                user.photoURL ||
-                '/quantum-computing-student.jpg',
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
               coverImage:
                 data.coverImage ||
                 '/quantum-computing-chip-with-glowing-circuits-and-b.jpg',
               bio: data.bio || 'HQCC member | Quantum & Computing Enthusiast',
               location: data.location || 'Hempstead, NY',
               website: data.website || 'hqcc.hofstra.edu',
-<<<<<<< HEAD
               joined: joinedDate,
-=======
-              joined: 'September 2023', // later: format data.createdAt
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
             };
           }
 
@@ -240,7 +107,6 @@ export default function ProfilePage() {
             website: loadedProfile.website || '',
           });
 
-<<<<<<< HEAD
           // 🔹 Fetch this user's posts (use targetUserId)
           let postsDocs = [];
           try {
@@ -280,21 +146,6 @@ export default function ProfilePage() {
           const userPosts = [];
 
           for (const docSnap of postsDocs) {
-=======
-          // 🔹 Fetch this user's posts
-          const postsRef = collection(db, 'posts');
-          const q = query(
-            postsRef,
-            where('authorId', '==', user.uid),
-            orderBy('createdAt', 'desc')
-          );
-
-          const postsSnap = await getDocs(q);
-
-          const userPosts = [];
-
-          for (const docSnap of postsSnap.docs) {
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
             const data = docSnap.data();
 
             let replyCount = 0;
@@ -308,7 +159,6 @@ export default function ProfilePage() {
               );
             }
 
-<<<<<<< HEAD
             // Check if current user has liked this post
             let isLiked = false;
             if (user.uid) {
@@ -321,22 +171,6 @@ export default function ProfilePage() {
               }
             }
 
-=======
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
-            userPosts.push({
-              id: docSnap.id,
-              content: data.content || '',
-              timestamp: data.createdAt
-                ? data.createdAt.toDate().toLocaleString()
-                : 'Just now',
-              likes: data.likesCount ?? 0,
-              comments: replyCount, // ✅ reply count from subcollection
-              shares: data.sharesCount ?? 0,
-<<<<<<< HEAD
-              isLiked,
-=======
-              isLiked: false,
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
               isBookmarked: false,
               image: data.imageUrl || null,
             });
@@ -359,7 +193,6 @@ export default function ProfilePage() {
               },
             ]);
           }
-<<<<<<< HEAD
 
           // Fetch posts that this user has liked (for Likes tab)
           // Only fetch if viewing own profile
@@ -430,10 +263,6 @@ export default function ProfilePage() {
           console.error('Error loading profile or posts:', err);
           setError('Failed to load profile. Please try again.');
           setLoading(false);
-=======
-        } catch (err) {
-          console.error('Error loading profile or posts:', err);
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
         } finally {
           setLoading(false);
         }
@@ -441,7 +270,6 @@ export default function ProfilePage() {
     });
 
     return () => unsub();
-<<<<<<< HEAD
   }, [router, profileId]);
 
   const handleLike = async (postId, postsArray, setPostsArray) => {
@@ -454,27 +282,17 @@ export default function ProfilePage() {
     const wasLiked = post?.isLiked || false;
 
     // Optimistic UI update
-=======
-  }, [router]);
-
-  const handleLike = (postId, postsArray, setPostsArray) => {
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
     setPostsArray(
       postsArray.map((post) =>
         post.id === postId
           ? {
               ...post,
-<<<<<<< HEAD
               likes: post.isLiked ? Math.max(0, post.likes - 1) : post.likes + 1,
-=======
-              likes: post.isLiked ? post.likes - 1 : post.likes + 1,
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
               isLiked: !post.isLiked,
             }
           : post
       )
     );
-<<<<<<< HEAD
 
     // Firestore toggle (one like per user)
     try {
@@ -539,65 +357,6 @@ export default function ProfilePage() {
       );
       alert('Failed to like post. Please try again.');
     }
-=======
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
-  };
-
-  const handleBookmark = (postId, postsArray, setPostsArray) => {
-    setPostsArray(
-      postsArray.map((post) =>
-        post.id === postId
-          ? { ...post, isBookmarked: !post.isBookmarked }
-          : post
-      )
-    );
-  };
-
-<<<<<<< HEAD
-  // Handle sending a message to this user
-  const handleSendMessage = async () => {
-    if (!currentUserId || !profile?.uid || currentUserId === profile.uid) {
-      return;
-    }
-
-    try {
-      setSendingMessage(true);
-      const conversationId = await findOrCreateConversation(
-        currentUserId,
-        profile.uid
-      );
-      router.push(`/member/messages/${conversationId}`);
-    } catch (error) {
-      console.error('Error creating/finding conversation:', error);
-      alert('Failed to start conversation. Please try again.');
-    } finally {
-      setSendingMessage(false);
-    }
-  };
-
-  // Validate file before upload
-  const validateFile = (file, type = 'avatar') => {
-    const maxSize = type === 'avatar' ? 5 * 1024 * 1024 : 10 * 1024 * 1024; // 5MB for avatar, 10MB for cover
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-
-    if (!file) return null;
-
-    // Check file type
-    if (!allowedTypes.includes(file.type)) {
-      return `Invalid file type. Please upload a JPEG, PNG, GIF, or WebP image.`;
-    }
-
-    // Check file size
-    if (file.size > maxSize) {
-      const maxSizeMB = maxSize / (1024 * 1024);
-      return `File size too large. Maximum size is ${maxSizeMB}MB for ${type === 'avatar' ? 'avatars' : 'cover images'}.`;
-    }
-
-    return null;
-  };
-
-=======
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
   // Save profile changes (text fields + avatar + cover photo)
   const handleSaveProfile = async (e) => {
     e.preventDefault();
@@ -606,7 +365,6 @@ export default function ProfilePage() {
     try {
       setSaving(true);
 
-<<<<<<< HEAD
       // Validate files before upload
       if (avatarFile) {
         const avatarError = validateFile(avatarFile, 'avatar');
@@ -703,41 +461,6 @@ export default function ProfilePage() {
         console.error('Firestore save error:', firestoreError);
         throw new Error(`Failed to save profile: ${firestoreError.message || 'Unknown error'}`);
       }
-=======
-      let avatarUrl = profile.avatar;
-      let coverUrl = profile.coverImage;
-
-      if (avatarFile) {
-        const avatarRef = ref(storage, `avatars/${profile.uid}`);
-        await uploadBytes(avatarRef, avatarFile);
-        avatarUrl = await getDownloadURL(avatarRef);
-      }
-
-      if (coverFile) {
-        const coverRef = ref(storage, `covers/${profile.uid}`);
-        await uploadBytes(coverRef, coverFile);
-        coverUrl = await getDownloadURL(coverRef);
-      }
-
-      const refDoc = doc(db, 'members', profile.uid);
-
-      await setDoc(
-        refDoc,
-        {
-          name: editData.name.trim() || profile.name,
-          username:
-            editData.username.trim() ||
-            profile.username ||
-            profile.email.split('@')[0],
-          bio: editData.bio.trim(),
-          location: editData.location.trim(),
-          website: editData.website.trim(),
-          avatar: avatarUrl,
-          coverImage: coverUrl,
-        },
-        { merge: true }
-      );
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
 
       // Update local state
       setProfile((prev) => ({
@@ -755,7 +478,6 @@ export default function ProfilePage() {
       setIsEditing(false);
       setAvatarFile(null);
       setCoverFile(null);
-<<<<<<< HEAD
       
       // Show success message
       alert('Profile updated successfully!');
@@ -763,17 +485,11 @@ export default function ProfilePage() {
       console.error('Error saving profile:', err);
       const errorMessage = err.message || 'Failed to save profile. Please try again.';
       alert(errorMessage);
-=======
-    } catch (err) {
-      console.error('Error saving profile:', err);
-      alert('Failed to save profile. Please try again.');
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
     } finally {
       setSaving(false);
     }
   };
 
-<<<<<<< HEAD
   const PostCard = ({ post, postsArray, setPostsArray }) => {
     // For liked posts, show the post author's info; for own posts, show profile owner's info
     const displayName = post.authorName || profile.name;
@@ -787,21 +503,11 @@ export default function ProfilePage() {
           <AvatarImage src={displayAvatar || '/placeholder.svg'} />
           <AvatarFallback>
             {displayName ? displayName.slice(0, 2).toUpperCase() : 'HQ'}
-=======
-  const PostCard = ({ post, postsArray, setPostsArray }) => (
-    <Card className="p-6 bg-card/50 backdrop-blur-xl border-border/50 hover:border-primary/30 transition-all duration-300">
-      <div className="flex items-start gap-4 mb-4">
-        <Avatar className="h-12 w-12 ring-2 ring-primary/20">
-          <AvatarImage src={profile.avatar || '/placeholder.svg'} />
-          <AvatarFallback>
-            {profile.name ? profile.name.slice(0, 2) : 'HQ'}
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
           </AvatarFallback>
         </Avatar>
         <div className="flex-1">
           <div className="flex items-center justify-between mb-1">
             <div className="flex items-center gap-2 ">
-<<<<<<< HEAD
               {post.authorId ? (
                 <Link
                   href={`/member/profile/${post.authorId}`}
@@ -814,11 +520,6 @@ export default function ProfilePage() {
               )}
               <span className="text-xs text-muted-foreground">
                 @{displayUsername}
-=======
-              <h3 className="font-semibold text-foreground">{profile.name}</h3>
-              <span className="text-xs text-muted-foreground">
-                @{profile.username}
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
               </span>
             </div>
             <Button
@@ -896,16 +597,10 @@ export default function ProfilePage() {
         </Button>
       </div>
     </Card>
-<<<<<<< HEAD
     );
   };
 
   if (loading) {
-=======
-  );
-
-  if (loading || !profile) {
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <p className="text-muted-foreground">Loading profile...</p>
@@ -913,7 +608,6 @@ export default function ProfilePage() {
     );
   }
 
-<<<<<<< HEAD
   if (error || !profile) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -929,35 +623,6 @@ export default function ProfilePage() {
     );
   }
 
-=======
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
-  return (
-    <div className="min-h-screen bg-background">
-      <div className="fixed inset-0 overflow-hidden pointer-events-none -z-10">
-        <div className="absolute top-20 right-20 w-96 h-96 bg-primary/20 rounded-full blur-[120px] animate-float-gentle" />
-        <div
-          className="absolute bottom-20 left-20 w-96 h-96 bg-secondary/20 rounded-full blur-[120px] animate-float-gentle"
-          style={{ animationDelay: '2s' }}
-        />
-      </div>
-
-      <main className="max-w-4xl mx-auto px-4 pt-20 pb-20">
-        {/* Profile header */}
-        <Card className="overflow-hidden bg-card/50 backdrop-blur-xl border-border/50 mb-6">
-          <div className="relative h-48 md:h-64 bg-linear-to-r from-primary/20 via-accent/20 to-secondary/20">
-            <Image
-              src={profile.coverImage || '/placeholder.svg'}
-              alt="Cover"
-              className="w-full h-full object-cover opacity-50"
-              width={1200}
-              height={400}
-            />
-
-<<<<<<< HEAD
-            {isEditing && isCurrentUserProfile && (
-=======
-            {isEditing && (
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
               <div className="absolute inset-0 flex items-center justify-center bg-black/30">
                 <label className="bg-background/80 px-4 py-2 rounded-md text-sm cursor-pointer hover:bg-background">
                   Change cover photo
@@ -984,7 +649,6 @@ export default function ProfilePage() {
               </Avatar>
             </div>
 
-<<<<<<< HEAD
             {/* Edit Profile toggle or Send Message button */}
             <div className="flex justify-end">
               {isCurrentUserProfile ? (
@@ -1023,21 +687,6 @@ export default function ProfilePage() {
                   )}
                 </Button>
               )}
-=======
-            {/* Edit Profile toggle */}
-            <div className="flex justify-end">
-              <Button
-                onClick={() => setIsEditing((prev) => !prev)}
-                className="
-                  bg-linear-to-r from-primary via-accent to-secondary
-                  text-white font-medium
-                  hover:opacity-90
-                  transition-all
-                "
-              >
-                {isEditing ? 'Cancel' : 'Edit Profile'}
-              </Button>
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
             </div>
 
             {/* Profile Info / Edit Form */}

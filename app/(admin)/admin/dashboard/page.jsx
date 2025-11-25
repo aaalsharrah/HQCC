@@ -1,10 +1,6 @@
 'use client';
 
-<<<<<<< HEAD
 import { useState, useEffect } from 'react';
-=======
-import { useState } from 'react';
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
 import {
   Users,
   Calendar,
@@ -22,140 +18,11 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
-<<<<<<< HEAD
   Loader2,
-=======
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
-} from 'lucide-react';
-import { Card } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import Link from 'next/link';
-<<<<<<< HEAD
-import { db, auth } from '@/app/lib/firebase/firebase';
-import {
-  collection,
-  getDocs,
-  doc,
-  getDoc,
-  Timestamp,
-  addDoc,
-  query,
-  where,
-  orderBy,
-} from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
-import { createNotification } from '@/app/lib/firebase/notifications';
-=======
-
-const initialEvents = [
-  {
-    id: 1,
-    title: 'Quantum Computing Workshop',
-    date: '2024-02-15',
-    time: '6:00 PM - 8:00 PM',
-    location: 'Engineering Lab 201',
-    attendees: 45,
-    status: 'Scheduled',
-    category: 'Workshop',
-    description:
-      'Hands-on introduction to quantum algorithms and circuit design using Qiskit.',
-    image: '/quantum-computing-workshop.jpg',
-    spots: 50,
-    organizer: {
-      name: 'Abdallah Aisharrah',
-      role: 'Founder & President',
-      avatar: '/professional-man.jpg',
-    },
-    agenda: [
-      { time: '6:00 PM', title: 'Welcome & Introduction', duration: '15 min' },
-      { time: '6:15 PM', title: 'Quantum Basics Overview', duration: '30 min' },
-      {
-        time: '6:45 PM',
-        title: 'Hands-on Qiskit Tutorial',
-        duration: '45 min',
-      },
-      {
-        time: '7:30 PM',
-        title: 'Build Your First Circuit',
-        duration: '20 min',
-      },
-      { time: '7:50 PM', title: 'Q&A Session', duration: '10 min' },
-    ],
-    requirements: [
-      'Laptop with Python installed',
-      'Basic programming knowledge',
-      'Qiskit installed (installation guide will be sent)',
-      'Curiosity and enthusiasm!',
-    ],
-    attendeesList: [],
-  },
-  {
-    id: 2,
-    title: 'Guest Lecture: IBM Quantum',
-    date: '2024-02-22',
-    time: '7:00 PM - 9:00 PM',
-    location: 'Auditorium Hall A',
-    attendees: 120,
-    status: 'Scheduled',
-    category: 'Lecture',
-    description:
-      'Industry leader from IBM Quantum discusses the future of quantum computing.',
-    image: '/quantum-lecture-hall.jpg',
-    spots: 150,
-    organizer: {
-      name: 'Abdallah Aisharrah',
-      role: 'Founder & President',
-      avatar: '/professional-man.jpg',
-    },
-    agenda: [
-      { time: '7:00 PM', title: 'Introduction & Welcome', duration: '10 min' },
-      { time: '7:10 PM', title: 'IBM Quantum Overview', duration: '30 min' },
-      { time: '7:40 PM', title: 'Recent Breakthroughs', duration: '40 min' },
-      { time: '8:20 PM', title: 'Industry Applications', duration: '20 min' },
-      { time: '8:40 PM', title: 'Q&A with Speaker', duration: '20 min' },
-    ],
-    requirements: [
-      'No prerequisites required',
-      'Bring your questions!',
-      'Business casual attire recommended',
-    ],
-    attendeesList: [],
-  },
-  {
-    id: 3,
-    title: 'Quantum Hackathon 2024',
-    date: '2024-03-10',
-    time: '9:00 AM - 6:00 PM',
-    location: 'Computer Science Building',
-    attendees: 80,
-    status: 'Draft',
-    category: 'Hackathon',
-    description:
-      '24-hour quantum computing hackathon with prizes and mentorship.',
-    image: '/hackathon-coding.jpg',
-    spots: 100,
-    organizer: {
-      name: 'Abdallah Aisharrah',
-      role: 'Founder & President',
-      avatar: '/professional-man.jpg',
-    },
-    agenda: [
-      { time: '9:00 AM', title: 'Check-in & Breakfast', duration: '60 min' },
-      { time: '10:00 AM', title: 'Kickoff & Rules', duration: '30 min' },
-    ],
-    requirements: ['Laptop', 'GitHub account', 'Team spirit'],
-    attendeesList: [],
-  },
-];
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
   const [searchQuery, setSearchQuery] = useState('');
-<<<<<<< HEAD
   const [events, setEvents] = useState([]);
   const [users, setUsers] = useState([]);
   const [analytics, setAnalytics] = useState({
@@ -169,9 +36,6 @@ export default function AdminDashboard() {
     engagementRate: 0,
   });
   const [loading, setLoading] = useState(true);
-=======
-  const [events, setEvents] = useState(initialEvents);
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
 
   const [form, setForm] = useState({
     title: '',
@@ -189,7 +53,6 @@ export default function AdminDashboard() {
     requirementsText: '',
   });
 
-<<<<<<< HEAD
   // Helper function to format date
   function formatDate(timestamp) {
     if (!timestamp) return 'N/A';
@@ -619,77 +482,6 @@ export default function AdminDashboard() {
     
     return () => unsubscribe();
   }, []);
-=======
-  const analytics = {
-    totalUsers: 45,
-    activeUsers: 38,
-    newUsersThisMonth: 12,
-    totalEvents: events.length,
-    upcomingEvents: events.filter((e) => e.status === 'Scheduled').length,
-    completedEvents: events.filter((e) => e.status === 'Completed').length,
-    avgAttendance:
-      events.length > 0
-        ? Math.round(
-            events.reduce((sum, e) => sum + (e.attendees || 0), 0) /
-              events.length,
-          )
-        : 0,
-    engagementRate: 84,
-  };
-
-  const users = [
-    {
-      id: 1,
-      name: 'Abdallah Aisharrah',
-      email: 'abdallah@hqcc.org',
-      role: 'President',
-      status: 'Active',
-      joinDate: 'Jan 2024',
-      posts: 45,
-      events: 28,
-    },
-    {
-      id: 2,
-      name: 'Sarah Chen',
-      email: 'sarah@hqcc.org',
-      role: 'Vice President',
-      status: 'Active',
-      joinDate: 'Feb 2024',
-      posts: 32,
-      events: 24,
-    },
-    {
-      id: 3,
-      name: 'Marcus Rodriguez',
-      email: 'marcus@hqcc.org',
-      role: 'Member',
-      status: 'Active',
-      joinDate: 'Mar 2024',
-      posts: 28,
-      events: 18,
-    },
-    {
-      id: 4,
-      name: 'Emily Thompson',
-      email: 'emily@hqcc.org',
-      role: 'Member',
-      status: 'Pending',
-      joinDate: 'Dec 2024',
-      posts: 5,
-      events: 2,
-    },
-    {
-      id: 5,
-      name: 'David Kim',
-      email: 'david@hqcc.org',
-      role: 'Member',
-      status: 'Inactive',
-      joinDate: 'Sep 2024',
-      posts: 12,
-      events: 8,
-    },
-  ];
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
 
   const handleFormChange = (field) => (e) => {
     setForm((prev) => ({
@@ -698,17 +490,12 @@ export default function AdminDashboard() {
     }));
   };
 
-<<<<<<< HEAD
   const handleCreateEvent = async () => {
-=======
-  const handleCreateEvent = () => {
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
     if (!form.title || !form.date || !form.time || !form.location) {
       alert('Please fill in at least Title, Date, Time, and Location.');
       return;
     }
 
-<<<<<<< HEAD
     try {
       const agenda =
         form.agendaText
@@ -888,71 +675,6 @@ export default function AdminDashboard() {
       console.error('Error creating event:', error);
       alert('Failed to create event. Please try again.');
     }
-=======
-    const newId =
-      events.length > 0 ? Math.max(...events.map((e) => e.id)) + 1 : 1;
-
-    const agenda =
-      form.agendaText
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .map((line) => {
-          const [time, title, duration] = line.split('|').map((s) => s.trim());
-          return {
-            time: time || '',
-            title: title || '',
-            duration: duration || '',
-          };
-        }) || [];
-
-    const requirements =
-      form.requirementsText
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean) || [];
-
-    const newEvent = {
-      id: newId,
-      title: form.title,
-      date: form.date,
-      time: form.time,
-      location: form.location,
-      attendees: 0,
-      status: 'Scheduled',
-      category: form.category || 'Event',
-      description: form.description,
-      image: form.image || '/placeholder.svg',
-      spots: Number(form.spots) || 0,
-      organizer: {
-        name: form.organizerName || 'HQCC Team',
-        role: form.organizerRole || 'Organizer',
-        avatar: form.organizerAvatar || '/professional-man.jpg',
-      },
-      agenda,
-      requirements,
-      attendeesList: [],
-    };
-
-    setEvents((prev) => [...prev, newEvent]);
-
-    // reset form
-    setForm({
-      title: '',
-      category: '',
-      date: '',
-      time: '',
-      location: '',
-      spots: '',
-      image: '',
-      description: '',
-      organizerName: '',
-      organizerRole: '',
-      organizerAvatar: '',
-      agendaText: '',
-      requirementsText: '',
-    });
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
   };
 
   return (
@@ -1025,7 +747,6 @@ export default function AdminDashboard() {
                     </div>
                     <Badge variant="secondary" className="gap-1">
                       <TrendingUp className="h-3 w-3" />
-<<<<<<< HEAD
                       +{analytics.newUsersThisMonth}
                     </Badge>
                   </div>
@@ -1035,13 +756,6 @@ export default function AdminDashboard() {
                     ) : (
                       analytics.totalUsers
                     )}
-=======
-                      +12
-                    </Badge>
-                  </div>
-                  <div className="text-3xl font-bold mb-1">
-                    {analytics.totalUsers}
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
                   </div>
                   <div className="text-sm text-foreground/60">
                     Total Members
@@ -1062,15 +776,11 @@ export default function AdminDashboard() {
                     </Badge>
                   </div>
                   <div className="text-3xl font-bold mb-1">
-<<<<<<< HEAD
                     {loading ? (
                       <Loader2 className="h-8 w-8 animate-spin text-accent" />
                     ) : (
                       analytics.totalEvents
                     )}
-=======
-                    {analytics.totalEvents}
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
                   </div>
                   <div className="text-sm text-foreground/60">Total Events</div>
                   <div className="mt-2 text-xs text-accent">
@@ -1086,15 +796,11 @@ export default function AdminDashboard() {
                     <Badge variant="secondary">Avg</Badge>
                   </div>
                   <div className="text-3xl font-bold mb-1">
-<<<<<<< HEAD
                     {loading ? (
                       <Loader2 className="h-8 w-8 animate-spin text-secondary" />
                     ) : (
                       analytics.avgAttendance
                     )}
-=======
-                    {analytics.avgAttendance}
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
                   </div>
                   <div className="text-sm text-foreground/60">
                     Avg Attendance
@@ -1109,7 +815,6 @@ export default function AdminDashboard() {
                     </div>
                     <Badge variant="secondary" className="gap-1">
                       <TrendingUp className="h-3 w-3" />
-<<<<<<< HEAD
                       {analytics.engagementRate > 0 ? '+' : ''}
                       {analytics.engagementRate}%
                     </Badge>
@@ -1120,13 +825,6 @@ export default function AdminDashboard() {
                     ) : (
                       `${analytics.engagementRate}%`
                     )}
-=======
-                      +8%
-                    </Badge>
-                  </div>
-                  <div className="text-3xl font-bold mb-1">
-                    {analytics.engagementRate}%
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
                   </div>
                   <div className="text-sm text-foreground/60">
                     Engagement Rate
@@ -1142,7 +840,6 @@ export default function AdminDashboard() {
                     <Users className="h-5 w-5 text-primary" />
                     Recent Members
                   </h3>
-<<<<<<< HEAD
                   {loading ? (
                     <div className="flex justify-center items-center py-8">
                       <Loader2 className="h-6 w-6 animate-spin text-primary" />
@@ -1154,10 +851,6 @@ export default function AdminDashboard() {
                   ) : (
                     <div className="space-y-4">
                       {users.slice(0, 4).map((user) => (
-=======
-                  <div className="space-y-4">
-                    {users.slice(0, 4).map((user) => (
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
                       <div
                         key={user.id}
                         className="flex items-center justify-between p-3 rounded-lg bg-background/50 hover:bg-background transition-colors"
@@ -1188,14 +881,9 @@ export default function AdminDashboard() {
                           {user.status}
                         </Badge>
                       </div>
-<<<<<<< HEAD
                       ))}
                     </div>
                   )}
-=======
-                    ))}
-                  </div>
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
                 </Card>
 
                 <Card className="p-6 bg-card/50 backdrop-blur-xl border-border">
@@ -1203,7 +891,6 @@ export default function AdminDashboard() {
                     <Calendar className="h-5 w-5 text-accent" />
                     Upcoming Events
                   </h3>
-<<<<<<< HEAD
                   {loading ? (
                     <div className="flex justify-center items-center py-8">
                       <Loader2 className="h-6 w-6 animate-spin text-accent" />
@@ -1267,28 +954,6 @@ export default function AdminDashboard() {
                       })()}
                     </>
                   )}
-=======
-                  <div className="space-y-4">
-                    {events.slice(0, 3).map((event) => (
-                      <div
-                        key={event.id}
-                        className="flex items-center justify-between p-3 rounded-lg bg-background/50 hover:bg-background transition-colors"
-                      >
-                        <div>
-                          <div className="font-medium mb-1">{event.title}</div>
-                          <div className="text-xs text-foreground/60 flex items-center gap-3">
-                            <span>{event.date}</span>
-                            <span>•</span>
-                            <span>{event.time}</span>
-                          </div>
-                        </div>
-                        <Badge variant="secondary">
-                          {event.attendees} RSVPs
-                        </Badge>
-                      </div>
-                    ))}
-                  </div>
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
                 </Card>
               </div>
             </TabsContent>
@@ -1345,7 +1010,6 @@ export default function AdminDashboard() {
                       </tr>
                     </thead>
                     <tbody>
-<<<<<<< HEAD
                       {loading ? (
                         <tr>
                           <td colSpan={6} className="p-8 text-center">
@@ -1370,9 +1034,6 @@ export default function AdminDashboard() {
                             );
                           })
                           .map((user) => (
-=======
-                      {users.map((user) => (
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
                         <tr
                           key={user.id}
                           className="border-b border-border hover:bg-background/50 transition-colors"
@@ -1470,12 +1131,8 @@ export default function AdminDashboard() {
                             </div>
                           </td>
                         </tr>
-<<<<<<< HEAD
                           ))
                       )}
-=======
-                      ))}
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
                     </tbody>
                   </table>
                 </div>
@@ -1721,7 +1378,6 @@ export default function AdminDashboard() {
                   </div>
                 </div>
 
-<<<<<<< HEAD
                 {loading ? (
                   <div className="flex justify-center items-center py-12">
                     <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -1733,10 +1389,6 @@ export default function AdminDashboard() {
                 ) : (
                   <div className="space-y-4">
                     {events.map((event) => (
-=======
-                <div className="space-y-4">
-                  {events.map((event) => (
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
                     <Card
                       key={event.id}
                       className="p-4 bg-background/50 border-border hover:border-primary/50 transition-all"
@@ -1813,14 +1465,9 @@ export default function AdminDashboard() {
                         </div>
                       </div>
                     </Card>
-<<<<<<< HEAD
                     ))}
                   </div>
                 )}
-=======
-                  ))}
-                </div>
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
               </Card>
             </TabsContent>
           </Tabs>

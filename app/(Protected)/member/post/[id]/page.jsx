@@ -16,11 +16,7 @@ import {
   subscribeToPost,
   subscribeToReplies,
   createReply,
-<<<<<<< HEAD
   toggleLike,
-=======
-  incrementLikes,
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
 } from '@/app/lib/firebase/post';
 
 export default function PostThreadPage(props) {
@@ -43,7 +39,6 @@ export default function PostThreadPage(props) {
     return () => unsub();
   }, []);
 
-<<<<<<< HEAD
       // Subscribe to the post + replies
       useEffect(() => {
         if (!id || !currentUser) return;
@@ -52,16 +47,6 @@ export default function PostThreadPage(props) {
           setPost(fetchedPost);
           setLoading(false);
         }, currentUser.uid);
-=======
-  // Subscribe to the post + replies
-  useEffect(() => {
-    if (!id) return;
-
-    const unsubPost = subscribeToPost(id, (fetchedPost) => {
-      setPost(fetchedPost);
-      setLoading(false);
-    });
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
 
     const unsubReplies = subscribeToReplies(id, (fetchedReplies) => {
       setReplies(fetchedReplies);
@@ -74,18 +59,12 @@ export default function PostThreadPage(props) {
   }, [id]);
 
   const handleLike = async () => {
-<<<<<<< HEAD
     if (!post || !currentUser) {
       alert('You must be logged in to like posts.');
       return;
     }
 
     // Optimistic UI update
-=======
-    if (!post) return;
-
-    // local UI toggle
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
     setPost((prev) =>
       prev
         ? {
@@ -98,7 +77,6 @@ export default function PostThreadPage(props) {
         : prev
     );
 
-<<<<<<< HEAD
     // Firestore toggle (one like per user)
     try {
       await toggleLike(id, currentUser.uid);
@@ -117,14 +95,6 @@ export default function PostThreadPage(props) {
           : prev
       );
       alert('Failed to like post. Please try again.');
-=======
-    try {
-      const delta = post.isLiked ? -1 : 1;
-      await incrementLikes(id, delta);
-    } catch (err) {
-      console.error('Failed to update likes', err);
-      // optional: revert UI
->>>>>>> f2c366d48b05bc8fd801d3a23e934dd71c5d3c00
     }
   };
 
