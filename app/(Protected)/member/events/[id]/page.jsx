@@ -12,7 +12,6 @@ import {
   Heart,
   MessageCircle,
   CheckCircle,
-  X,
 } from 'lucide-react';
 import Link from 'next/link';
 import { db } from '@/app/lib/firebase/firebase';
@@ -35,11 +34,11 @@ export default function EventDetailPage(props) {
   const params = use(props.params);
   const { id } = params; // 'id' from /member/events/[id]
   const [event, setEvent] = useState(null);
-  const [isRegistered, setIsRegistered] = useState(false);
-  const [showRSVP, setShowRSVP] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!id) return; // ✅ don't run until we actually have an id
+
     async function fetchEvent() {
       try {
         setLoading(true);
@@ -65,12 +64,12 @@ export default function EventDetailPage(props) {
           attendees: data.attendees || 0,
           category: data.category || 'Event',
           description: data.description || '',
-          image: data.image || '/placeholder.svg',
+          image: data.image || '/logo1.png',
           spots: data.spots || 0,
           organizer: data.organizer || {
             name: 'HQCC',
             role: 'Organizer',
-            avatar: '/placeholder.svg',
+            avatar: '/logo1.png',
           },
           agenda: data.agenda || [],
           requirements: data.requirements || [],
@@ -88,12 +87,6 @@ export default function EventDetailPage(props) {
 
     fetchEvent();
   }, [id]);
-
-  const handleRSVP = () => {
-    // later you’ll write Firestore registration logic here
-    setIsRegistered(true);
-    setShowRSVP(false);
-  };
 
   if (loading) {
     return (
@@ -142,7 +135,7 @@ export default function EventDetailPage(props) {
           {/* Hero Image */}
           <div className="relative h-96 rounded-3xl overflow-hidden mb-8 border border-border">
             <img
-              src={event.image || '/placeholder.svg'}
+              src={event.image || '/logo1.png'}
               alt={event.title}
               className="w-full h-full object-cover"
             />
@@ -262,14 +255,14 @@ export default function EventDetailPage(props) {
                       className="flex items-center gap-3 p-3 rounded-xl bg-background/50 border border-border hover:border-primary/50 transition-colors"
                     >
                       <Image
-                        src={attendee.avatar || '/placeholder.svg'}
+                        src={attendee.avatar || '/logo1.png'}
                         alt={attendee.name || 'Attendee'}
                         width={48}
                         height={48}
                         className="w-12 h-12 rounded-full object-cover"
                         unoptimized={attendee.avatar?.startsWith('http')}
                         onError={(e) => {
-                          e.target.src = '/placeholder.svg';
+                          e.currentTarget.src = '/logo1.png';
                         }}
                       />
 
@@ -316,31 +309,18 @@ export default function EventDetailPage(props) {
                     />
                   </div>
 
-                  {isRegistered ? (
-                    <div className="space-y-3">
-                      <div className="flex items-center gap-2 text-primary p-4 bg-primary/10 rounded-xl border border-primary/20">
-                        <CheckCircle className="w-5 h-5" />
-                        <span className="font-medium">
-                          You&apos;re Registered!
-                        </span>
-                      </div>
-                      <Button
-                        variant="outline"
-                        className="w-full bg-transparent"
-                        onClick={() => setIsRegistered(false)}
-                      >
-                        Cancel Registration
-                      </Button>
-                    </div>
-                  ) : (
+                  {/* Register goes to full form page */}
+                  <Link
+                    href={`/member/events/${id}/register`}
+                    className="w-full"
+                  >
                     <Button
                       className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
                       size="lg"
-                      onClick={() => setShowRSVP(true)}
                     >
                       Register for Event
                     </Button>
-                  )}
+                  </Link>
 
                   <div className="flex gap-2">
                     <Button
@@ -370,14 +350,14 @@ export default function EventDetailPage(props) {
                 </h3>
                 <div className="flex items-center gap-4 mb-4">
                   <Image
-                    src={attendee.avatar || '/placeholder.svg'}
-                    alt={attendee.name || 'Attendee'}
+                    src={event.organizer.avatar || '/logo1.png'}
+                    alt={event.organizer.name || 'Organizer'}
                     width={48}
                     height={48}
                     className="w-12 h-12 rounded-full object-cover"
-                    unoptimized={attendee.avatar?.startsWith('http')}
+                    unoptimized={event.organizer.avatar?.startsWith('http')}
                     onError={(e) => {
-                      e.target.src = '/placeholder.svg';
+                      e.currentTarget.src = '/logo1.png';
                     }}
                   />
 
@@ -419,71 +399,6 @@ export default function EventDetailPage(props) {
           </div>
         </div>
       </div>
-
-      {/* RSVP Modal */}
-      {showRSVP && (
-        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-card border border-border rounded-2xl p-8 max-w-md w-full relative">
-            <button
-              onClick={() => setShowRSVP(false)}
-              className="absolute top-4 right-4 text-muted-foreground hover:text-foreground"
-            >
-              <X className="w-5 h-5" />
-            </button>
-            <h2 className="text-2xl font-bold mb-4 text-foreground">
-              Confirm Registration
-            </h2>
-            <p className="text-muted-foreground mb-6">
-              You&apos;re about to register for{' '}
-              <span className="font-semibold text-foreground">
-                {event.title}
-              </span>
-            </p>
-            <div className="space-y-4 mb-6">
-              <div className="flex items-center gap-3 text-sm">
-                <Calendar className="w-5 h-5 text-primary" />
-                <span className="text-foreground">
-                  {event.date
-                    ? event.date.toLocaleDateString('en-US', {
-                        weekday: 'long',
-                        month: 'long',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })
-                    : 'Date TBA'}
-                </span>
-              </div>
-              {event.time && (
-                <div className="flex items-center gap-3 text-sm">
-                  <Clock className="w-5 h-5 text-accent" />
-                  <span className="text-foreground">{event.time}</span>
-                </div>
-              )}
-              {event.location && (
-                <div className="flex items-center gap-3 text-sm">
-                  <MapPin className="w-5 h-5 text-secondary" />
-                  <span className="text-foreground">{event.location}</span>
-                </div>
-              )}
-            </div>
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                className="flex-1 bg-transparent"
-                onClick={() => setShowRSVP(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                className="flex-1 bg-primary hover:bg-primary/90"
-                onClick={handleRSVP}
-              >
-                Confirm RSVP
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -37,6 +37,7 @@ import {
   query,
   where,
   orderBy,
+  updateDoc,
 } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { createNotification } from '@/app/lib/firebase/notifications';
@@ -57,6 +58,7 @@ export default function AdminDashboard() {
     engagementRate: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [editingEventId, setEditingEventId] = useState(null); // ✅ NEW
 
   const [form, setForm] = useState({
     title: '',
@@ -72,6 +74,7 @@ export default function AdminDashboard() {
     organizerAvatar: '',
     agendaText: '',
     requirementsText: '',
+    whosComingText: '', // ✅ NEW
   });
 
   // Helper function to format date
@@ -83,7 +86,10 @@ export default function AdminDashboard() {
         : timestamp?.toDate
         ? timestamp.toDate()
         : new Date(timestamp);
-    return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      year: 'numeric',
+    });
   }
 
   // Helper function to parse event date
@@ -94,7 +100,7 @@ export default function AdminDashboard() {
     if (typeof dateField === 'string') return new Date(dateField);
     return null;
   }
-  
+
   // Helper function to format date consistently (YYYY-MM-DD) using UTC
   function formatEventDate(eventDate) {
     if (!eventDate) return '';
@@ -108,36 +114,36 @@ export default function AdminDashboard() {
   // Fetch all data from Firestore
   useEffect(() => {
     console.log('Admin dashboard useEffect triggered');
-    
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
         console.error('No authenticated user');
         setLoading(false);
         return;
       }
-      
+
       console.log('User authenticated:', user.uid);
-      
+
       // Verify user is admin
       try {
         const userDocRef = doc(db, 'members', user.uid);
         const userDocSnap = await getDoc(userDocRef);
-        
+
         if (!userDocSnap.exists()) {
           console.error('User member document does not exist');
           setLoading(false);
           return;
         }
-        
+
         const userData = userDocSnap.data();
         console.log('User role:', userData.role);
-        
+
         if (userData.role !== 'admin') {
           console.error('User is not admin, role:', userData.role);
           setLoading(false);
           return;
         }
-        
+
         // User is admin, proceed with data fetch
         await fetchData();
       } catch (err) {
@@ -145,7 +151,7 @@ export default function AdminDashboard() {
         setLoading(false);
       }
     });
-    
+
     async function fetchData() {
       try {
         console.log('Starting data fetch...');
@@ -159,7 +165,7 @@ export default function AdminDashboard() {
           uid: doc.id, // Document ID is the UID
           ...doc.data(),
         }));
-        
+
         console.log('Fetched members:', membersData.length);
         if (membersData.length > 0) {
           console.log('Sample member data:', {
@@ -190,7 +196,7 @@ export default function AdminDashboard() {
           id: doc.id,
           ...doc.data(),
         }));
-        
+
         console.log('Admin dashboard - Fetched events:', eventsData.length);
         if (eventsData.length > 0) {
           console.log('Admin dashboard - Sample event:', {
@@ -227,7 +233,7 @@ export default function AdminDashboard() {
         });
         const activeUserIds = new Set(recentPosts.map((p) => p.authorId));
         const activeUsers = membersData.filter((m) =>
-          activeUserIds.has(m.uid || m.id),
+          activeUserIds.has(m.uid || m.id)
         ).length;
 
         // New users this month
@@ -269,7 +275,7 @@ export default function AdminDashboard() {
           attendanceValues.length > 0
             ? Math.round(
                 attendanceValues.reduce((sum, val) => sum + val, 0) /
-                  attendanceValues.length,
+                  attendanceValues.length
               )
             : 0;
 
@@ -347,20 +353,20 @@ export default function AdminDashboard() {
         const processedMembers = await Promise.all(
           membersData.map(async (member) => {
             const memberId = member.uid || member.id;
-            
+
             // Count posts by this member
             const memberPosts = postsData.filter(
-              (p) => p.authorId === memberId,
+              (p) => p.authorId === memberId
             ).length;
 
             // Count event registrations
             const memberRegistrations = registrationsData.filter(
-              (r) => r.userId === memberId,
+              (r) => r.userId === memberId
             ).length;
 
             // Determine status
             const hasRecentPost = recentPosts.some(
-              (p) => p.authorId === memberId,
+              (p) => p.authorId === memberId
             );
             const status = hasRecentPost ? 'Active' : 'Inactive';
 
@@ -374,9 +380,9 @@ export default function AdminDashboard() {
               posts: memberPosts,
               events: memberRegistrations,
             };
-          }),
+          })
         );
-        
+
         console.log('Processed members:', processedMembers.length);
         console.log('Sample processed member:', processedMembers[0]);
 
@@ -387,7 +393,7 @@ export default function AdminDashboard() {
           const memberB = membersData.find((m) => (m.uid || m.id) === b.id);
           const aDate = memberA?.createdAt || memberA?.joinedAt;
           const bDate = memberB?.createdAt || memberB?.joinedAt;
-          
+
           // If both have dates, sort by date (newest first)
           if (aDate && bDate) {
             const aDateObj =
@@ -404,26 +410,31 @@ export default function AdminDashboard() {
                 : new Date(bDate);
             return bDateObj - aDateObj;
           }
-          
+
           // If only one has a date, prioritize it
           if (aDate && !bDate) return -1;
           if (!aDate && bDate) return 1;
-          
+
           // If neither has a date, keep original order (or sort by ID)
           return 0;
         });
 
-        console.log('After sorting, first 4 members:', processedMembers.slice(0, 4).map(m => ({ id: m.id, name: m.name, email: m.email })));
+        console.log(
+          'After sorting, first 4 members:',
+          processedMembers
+            .slice(0, 4)
+            .map((m) => ({ id: m.id, name: m.name, email: m.email }))
+        );
         setUsers(processedMembers);
 
         // Process events data
         const processedEvents = eventsData.map((event) => {
           // Parse the date field (could be Timestamp, Date, or string)
           const eventDate = parseEventDate(event.date);
-          
+
           // Calculate attendees from registrations
           const attendees = registrationsData.filter(
-            (r) => r.eventId === event.id || r.event === event.id,
+            (r) => r.eventId === event.id || r.event === event.id
           ).length;
 
           // Format date for display using helper function
@@ -469,7 +480,7 @@ export default function AdminDashboard() {
         });
 
         setEvents(processedEvents);
-        
+
         console.log('Dashboard data loaded successfully:', {
           members: processedMembers.length,
           events: processedEvents.length,
@@ -500,7 +511,7 @@ export default function AdminDashboard() {
         setLoading(false);
       }
     }
-    
+
     return () => unsubscribe();
   }, []);
 
@@ -509,6 +520,57 @@ export default function AdminDashboard() {
       ...prev,
       [field]: e.target.value,
     }));
+  };
+  const startEditingEvent = (event) => {
+    setEditingEventId(event.id);
+
+    setForm({
+      title: event.title || '',
+      category: event.category || '',
+      date: event.date || '', // already in YYYY-MM-DD
+      time: event.time || '',
+      location: event.location || '',
+      spots: event.spots ? String(event.spots) : '',
+      image: event.image || '',
+      description: event.description || '',
+      organizerName: event.organizer?.name || '',
+      organizerRole: event.organizer?.role || '',
+      organizerAvatar: event.organizer?.avatar || '',
+      agendaText: (event.agenda || [])
+        .map((item) =>
+          `${item.time || ''} | ${item.title || ''} | ${
+            item.duration || ''
+          }`.trim()
+        )
+        .join('\n'),
+      requirementsText: (event.requirements || []).join('\n'),
+      whosComingText: (event.attendeesList || [])
+        .map((att) =>
+          `${att.name || ''} | ${att.role || ''} | ${att.avatar || ''}`.trim()
+        )
+        .join('\n'),
+    });
+
+    setActiveTab('events');
+  };
+  const cancelEditingEvent = () => {
+    setEditingEventId(null);
+    setForm({
+      title: '',
+      category: '',
+      date: '',
+      time: '',
+      location: '',
+      spots: '',
+      image: '',
+      description: '',
+      organizerName: '',
+      organizerRole: '',
+      organizerAvatar: '',
+      agendaText: '',
+      requirementsText: '',
+      whosComingText: '',
+    });
   };
 
   const handleCreateEvent = async () => {
@@ -524,7 +586,9 @@ export default function AdminDashboard() {
           .map((line) => line.trim())
           .filter(Boolean)
           .map((line) => {
-            const [time, title, duration] = line.split('|').map((s) => s.trim());
+            const [time, title, duration] = line
+              .split('|')
+              .map((s) => s.trim());
             return {
               time: time || '',
               title: title || '',
@@ -538,18 +602,28 @@ export default function AdminDashboard() {
           .map((line) => line.trim())
           .filter(Boolean) || [];
 
-      // Convert date string to Firestore Timestamp
-      // Parse the date string (YYYY-MM-DD) and create Date at UTC midnight to match how we read it
+      const whosComing =
+        form.whosComingText
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .map((line) => {
+            const [name, role, avatar] = line.split('|').map((s) => s.trim());
+            return {
+              name: name || '',
+              role: role || '',
+              avatar: avatar || '/professional-man.jpg',
+            };
+          }) || [];
+
+      // Convert date string to Firestore Timestamp (UTC midnight)
       let dateTimestamp;
       if (form.date) {
-        // Parse YYYY-MM-DD format and create date at UTC midnight
-        // This ensures consistent date storage and retrieval
         const [year, month, day] = form.date.split('-').map(Number);
-        // Create date at UTC midnight using Date.UTC
         const utcDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
         dateTimestamp = Timestamp.fromDate(utcDate);
-        
-        console.log('Creating event with date:', {
+
+        console.log('Creating/updating event with date:', {
           input: form.date,
           parsed: { year, month: month - 1, day },
           utcDate: utcDate.toISOString(),
@@ -560,7 +634,7 @@ export default function AdminDashboard() {
         dateTimestamp = Timestamp.now();
       }
 
-      const newEvent = {
+      const eventPayload = {
         title: form.title,
         date: dateTimestamp,
         time: form.time,
@@ -576,45 +650,60 @@ export default function AdminDashboard() {
         },
         agenda,
         requirements,
-        createdAt: Timestamp.now(),
+        attendeesList: whosComing,
       };
 
-      // Save to Firestore
-      const eventsRef = collection(db, 'events');
-      const eventDocRef = await addDoc(eventsRef, newEvent);
+      let eventDocRef;
 
-      // Create notifications for all members about the new event
-      try {
-        const membersRef = collection(db, 'members');
-        const membersSnapshot = await getDocs(membersRef);
-        
-        // Create notifications for each member
-        const notificationPromises = membersSnapshot.docs.map(async (memberDoc) => {
-          const memberId = memberDoc.id;
-          
-          // Don't create notification for the event creator (admin)
-          if (memberId === auth.currentUser?.uid) {
-            return;
-          }
-
-          await createNotification({
-            userId: memberId,
-            type: 'event',
-            actorId: auth.currentUser?.uid || 'system',
-            actorName: 'HQCC Events',
-            actorAvatar: '/quantum-computing-logo.jpg',
-            postId: eventDocRef.id, // Use event ID as postId for linking
-            postContent: `${form.title} - ${form.date} at ${form.time}`,
-          });
+      if (editingEventId) {
+        // 🔄 UPDATE existing event
+        eventDocRef = doc(db, 'events', editingEventId);
+        await updateDoc(eventDocRef, {
+          ...eventPayload,
+          updatedAt: Timestamp.now(),
+        });
+      } else {
+        // ✨ CREATE new event
+        const eventsRef = collection(db, 'events');
+        eventDocRef = await addDoc(eventsRef, {
+          ...eventPayload,
+          createdAt: Timestamp.now(),
         });
 
-        await Promise.all(notificationPromises);
-      } catch (error) {
-        // Don't fail event creation if notification creation fails
-        console.error('Error creating event notifications:', error);
+        // Create notifications for all members about the new event
+        try {
+          const membersRef = collection(db, 'members');
+          const membersSnapshot = await getDocs(membersRef);
+
+          const notificationPromises = membersSnapshot.docs.map(
+            async (memberDoc) => {
+              const memberId = memberDoc.id;
+
+              // Don't create notification for the event creator (admin)
+              if (memberId === auth.currentUser?.uid) {
+                return;
+              }
+
+              await createNotification({
+                userId: memberId,
+                type: 'event',
+                actorId: auth.currentUser?.uid || 'system',
+                actorName: 'HQCC Events',
+                actorAvatar: '/quantum-computing-logo.jpg',
+                postId: eventDocRef.id,
+                postContent: `${form.title} - ${form.date} at ${form.time}`,
+              });
+            }
+          );
+
+          await Promise.all(notificationPromises);
+        } catch (error) {
+          console.error('Error creating event notifications:', error);
+        }
       }
 
-      // Reset form
+      // Reset form + editing state
+      setEditingEventId(null);
       setForm({
         title: '',
         category: '',
@@ -629,17 +718,19 @@ export default function AdminDashboard() {
         organizerAvatar: '',
         agendaText: '',
         requirementsText: '',
+        whosComingText: '',
       });
 
-      // Refresh events by re-fetching
+      // Refresh events list (same logic you already have)
       const eventsSnapshot = await getDocs(collection(db, 'events'));
       const eventsData = eventsSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
 
-      // Fetch registrations for attendee counts
-      const registrationsSnapshot = await getDocs(collection(db, 'registrations'));
+      const registrationsSnapshot = await getDocs(
+        collection(db, 'registrations')
+      );
       const registrationsData = registrationsSnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
@@ -651,21 +742,22 @@ export default function AdminDashboard() {
       const processedEvents = eventsData.map((event) => {
         const eventDate = parseEventDate(event.date);
         const attendees = registrationsData.filter(
-          (r) => r.eventId === event.id || r.event === event.id,
+          (r) => r.eventId === event.id || r.event === event.id
         ).length;
 
-        // Format date using helper function
         let dateDisplay = '';
         if (eventDate) {
           dateDisplay = formatEventDate(eventDate);
         } else if (event.date) {
-          dateDisplay = typeof event.date === 'string' ? event.date.split('T')[0] : '';
+          dateDisplay =
+            typeof event.date === 'string' ? event.date.split('T')[0] : '';
         }
 
         return {
           id: event.id,
           title: event.title || 'Untitled Event',
           date: dateDisplay,
+          originalDate: eventDate || null,
           time: event.time || '',
           location: event.location || '',
           attendees,
@@ -681,7 +773,8 @@ export default function AdminDashboard() {
           },
           agenda: event.agenda || [],
           requirements: event.requirements || [],
-          attendeesList: [],
+          attendeesList: event.attendeesList || [],
+          attendeesListRaw: event.attendeesList || [],
         };
       });
 
@@ -693,8 +786,8 @@ export default function AdminDashboard() {
 
       setEvents(processedEvents);
     } catch (error) {
-      console.error('Error creating event:', error);
-      alert('Failed to create event. Please try again.');
+      console.error('Error creating/updating event:', error);
+      alert('Failed to save event. Please try again.');
     }
   };
 
@@ -767,8 +860,8 @@ export default function AdminDashboard() {
                       <Users className="h-6 w-6 text-primary" />
                     </div>
                     <Badge variant="secondary" className="gap-1">
-                      <TrendingUp className="h-3 w-3" />
-                      +{analytics.newUsersThisMonth}
+                      <TrendingUp className="h-3 w-3" />+
+                      {analytics.newUsersThisMonth}
                     </Badge>
                   </div>
                   <div className="text-3xl font-bold mb-1">
@@ -872,36 +965,36 @@ export default function AdminDashboard() {
                   ) : (
                     <div className="space-y-4">
                       {users.slice(0, 4).map((user) => (
-                      <div
-                        key={user.id}
-                        className="flex items-center justify-between p-3 rounded-lg bg-background/50 hover:bg-background transition-colors"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-linear-to-br from-primary to-accent flex items-center justify-center text-sm font-bold text-primary-foreground">
-                            {user.name
-                              .split(' ')
-                              .map((n) => n[0])
-                              .join('')}
-                          </div>
-                          <div>
-                            <div className="font-medium">{user.name}</div>
-                            <div className="text-xs text-foreground/60">
-                              {user.email}
+                        <div
+                          key={user.id}
+                          className="flex items-center justify-between p-3 rounded-lg bg-background/50 hover:bg-background transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-linear-to-br from-primary to-accent flex items-center justify-center text-sm font-bold text-primary-foreground">
+                              {user.name
+                                .split(' ')
+                                .map((n) => n[0])
+                                .join('')}
+                            </div>
+                            <div>
+                              <div className="font-medium">{user.name}</div>
+                              <div className="text-xs text-foreground/60">
+                                {user.email}
+                              </div>
                             </div>
                           </div>
+                          <Badge
+                            variant={
+                              user.status === 'Active'
+                                ? 'default'
+                                : user.status === 'Pending'
+                                ? 'secondary'
+                                : 'outline'
+                            }
+                          >
+                            {user.status}
+                          </Badge>
                         </div>
-                        <Badge
-                          variant={
-                            user.status === 'Active'
-                              ? 'default'
-                              : user.status === 'Pending'
-                              ? 'secondary'
-                              : 'outline'
-                          }
-                        >
-                          {user.status}
-                        </Badge>
-                      </div>
                       ))}
                     </div>
                   )}
@@ -927,7 +1020,10 @@ export default function AdminDashboard() {
                               if (!event.date) return false;
                               try {
                                 const eventDate = new Date(event.date);
-                                return !isNaN(eventDate.getTime()) && eventDate >= now;
+                                return (
+                                  !isNaN(eventDate.getTime()) &&
+                                  eventDate >= now
+                                );
                               } catch (e) {
                                 return false;
                               }
@@ -936,8 +1032,12 @@ export default function AdminDashboard() {
                             return event.originalDate >= now;
                           })
                           .sort((a, b) => {
-                            const aDate = a.originalDate || (a.date ? new Date(a.date) : null);
-                            const bDate = b.originalDate || (b.date ? new Date(b.date) : null);
+                            const aDate =
+                              a.originalDate ||
+                              (a.date ? new Date(a.date) : null);
+                            const bDate =
+                              b.originalDate ||
+                              (b.date ? new Date(b.date) : null);
                             if (!aDate || !bDate) return 0;
                             return aDate - bDate; // Soonest first
                           })
@@ -954,7 +1054,9 @@ export default function AdminDashboard() {
                                 className="flex items-center justify-between p-3 rounded-lg bg-background/50 hover:bg-background transition-colors"
                               >
                                 <div>
-                                  <div className="font-medium mb-1">{event.title}</div>
+                                  <div className="font-medium mb-1">
+                                    {event.title}
+                                  </div>
                                   <div className="text-xs text-foreground/60 flex items-center gap-3">
                                     <span>{event.date}</span>
                                     {event.time && (
@@ -1039,7 +1141,10 @@ export default function AdminDashboard() {
                         </tr>
                       ) : users.length === 0 ? (
                         <tr>
-                          <td colSpan={6} className="p-8 text-center text-muted-foreground">
+                          <td
+                            colSpan={6}
+                            className="p-8 text-center text-muted-foreground"
+                          >
                             No members found.
                           </td>
                         </tr>
@@ -1055,103 +1160,105 @@ export default function AdminDashboard() {
                             );
                           })
                           .map((user) => (
-                        <tr
-                          key={user.id}
-                          className="border-b border-border hover:bg-background/50 transition-colors"
-                        >
-                          <td className="p-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-full bg-linear-to-br from-primary to-accent flex items-center justify-center text-sm font-bold text-primary-foreground">
-                                {user.name
-                                  .split(' ')
-                                  .map((n) => n[0])
-                                  .join('')}
-                              </div>
-                              <div>
-                                <div className="font-medium">{user.name}</div>
-                                <div className="text-xs text-foreground/60">
-                                  {user.email}
-                                </div>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="p-4">
-                            <Badge variant="outline">{user.role}</Badge>
-                          </td>
-                          <td className="p-4">
-                            <Badge
-                              variant={
-                                user.status === 'Active'
-                                  ? 'default'
-                                  : user.status === 'Pending'
-                                  ? 'secondary'
-                                  : 'outline'
-                              }
-                              className="gap-1"
+                            <tr
+                              key={user.id}
+                              className="border-b border-border hover:bg-background/50 transition-colors"
                             >
-                              {user.status === 'Active' && (
-                                <CheckCircle2 className="h-3 w-3" />
-                              )}
-                              {user.status === 'Inactive' && (
-                                <XCircle className="h-3 w-3" />
-                              )}
-                              {user.status === 'Pending' && (
-                                <Clock className="h-3 w-3" />
-                              )}
-                              {user.status}
-                            </Badge>
-                          </td>
-                          <td className="p-4 text-sm text-foreground/60">
-                            {user.joinDate}
-                          </td>
-                          <td className="p-4">
-                            <div className="text-sm">
-                              <div>{user.posts} posts</div>
-                              <div className="text-xs text-foreground/60">
-                                {user.events} events
-                              </div>
-                            </div>
-                          </td>
-                          <td className="p-4">
-                            <div className="flex items-center justify-end gap-1">
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-8 w-8 hover:text-primary"
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-8 w-8 hover:text-accent"
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-8 w-8 hover:text-primary"
-                              >
-                                <Mail className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-8 w-8 hover:text-destructive"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="icon"
-                                variant="ghost"
-                                className="h-8 w-8"
-                              >
-                                <MoreVertical className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
+                              <td className="p-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 rounded-full bg-linear-to-br from-primary to-accent flex items-center justify-center text-sm font-bold text-primary-foreground">
+                                    {user.name
+                                      .split(' ')
+                                      .map((n) => n[0])
+                                      .join('')}
+                                  </div>
+                                  <div>
+                                    <div className="font-medium">
+                                      {user.name}
+                                    </div>
+                                    <div className="text-xs text-foreground/60">
+                                      {user.email}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <Badge variant="outline">{user.role}</Badge>
+                              </td>
+                              <td className="p-4">
+                                <Badge
+                                  variant={
+                                    user.status === 'Active'
+                                      ? 'default'
+                                      : user.status === 'Pending'
+                                      ? 'secondary'
+                                      : 'outline'
+                                  }
+                                  className="gap-1"
+                                >
+                                  {user.status === 'Active' && (
+                                    <CheckCircle2 className="h-3 w-3" />
+                                  )}
+                                  {user.status === 'Inactive' && (
+                                    <XCircle className="h-3 w-3" />
+                                  )}
+                                  {user.status === 'Pending' && (
+                                    <Clock className="h-3 w-3" />
+                                  )}
+                                  {user.status}
+                                </Badge>
+                              </td>
+                              <td className="p-4 text-sm text-foreground/60">
+                                {user.joinDate}
+                              </td>
+                              <td className="p-4">
+                                <div className="text-sm">
+                                  <div>{user.posts} posts</div>
+                                  <div className="text-xs text-foreground/60">
+                                    {user.events} events
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="p-4">
+                                <div className="flex items-center justify-end gap-1">
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 hover:text-primary"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 hover:text-accent"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 hover:text-primary"
+                                  >
+                                    <Mail className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8 hover:text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="h-8 w-8"
+                                  >
+                                    <MoreVertical className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
                           ))
                       )}
                     </tbody>
@@ -1319,8 +1426,8 @@ export default function AdminDashboard() {
                       format. Example:
                     </p>
                     <pre className="text-xs font-mono bg-background/60 border border-dashed border-border rounded-md p-2 mb-2">
-6:00 PM | Welcome & Introduction | 15 min
-6:15 PM | Quantum Basics Overview | 30 min
+                      6:00 PM | Welcome & Introduction | 15 min 6:15 PM |
+                      Quantum Basics Overview | 30 min
                     </pre>
                     <textarea
                       placeholder="6:00 PM | Welcome & Introduction | 15 min"
@@ -1333,52 +1440,79 @@ export default function AdminDashboard() {
 
                   {/* Requirements */}
                   <div className="md:col-span-2">
-                    <h4 className="text-sm font-semibold mb-2">
-                      Requirements
-                    </h4>
+                    <h4 className="text-sm font-semibold mb-2">Requirements</h4>
                     <p className="text-xs text-muted-foreground mb-1">
                       One requirement per line (shown under &quot;What to
                       Bring&quot;).
                     </p>
                     <textarea
-                      placeholder={'Laptop with Python installed\nBasic programming knowledge'}
+                      placeholder={
+                        'Laptop with Python installed\nBasic programming knowledge'
+                      }
                       className="w-full rounded-md border border-border bg-background/50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/60"
                       rows={3}
                       value={form.requirementsText}
                       onChange={handleFormChange('requirementsText')}
                     />
                   </div>
+                  {/* Who's Coming */}
+                  <div className="md:col-span-2">
+                    <h4 className="text-sm font-semibold mb-2">
+                      Who&apos;s Coming
+                    </h4>
+                    <p className="text-xs text-muted-foreground mb-1">
+                      One attendee per line using{' '}
+                      <span className="font-mono">name | role | avatarUrl</span>{' '}
+                      format. Example:
+                    </p>
+                    <pre className="text-xs font-mono bg-background/60 border border-dashed border-border rounded-md p-2 mb-2">
+                      Abdallah Aisharrah | Founder & President |
+                      /professional-man.jpg Jane Doe | VP, Events |
+                      /team-member-2.jpg
+                    </pre>
+                    <textarea
+                      placeholder="Abdallah Aisharrah | Founder & President | /professional-man.jpg"
+                      className="w-full rounded-md border border-border bg-background/50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/60"
+                      rows={3}
+                      value={form.whosComingText}
+                      onChange={handleFormChange('whosComingText')}
+                    />
+                  </div>
 
                   <div className="md:col-span-2 flex gap-3 pt-2">
-                    <Button
-                      className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                      onClick={handleCreateEvent}
-                    >
-                      Create Event
-                    </Button>
-                    <Button
-                      variant="outline"
-                      type="button"
-                      onClick={() =>
-                        setForm({
-                          title: '',
-                          category: '',
-                          date: '',
-                          time: '',
-                          location: '',
-                          spots: '',
-                          image: '',
-                          description: '',
-                          organizerName: '',
-                          organizerRole: '',
-                          organizerAvatar: '',
-                          agendaText: '',
-                          requirementsText: '',
-                        })
-                      }
-                    >
-                      Clear Form
-                    </Button>
+                    <div className="md:col-span-2 flex gap-3 pt-2">
+                      <Button
+                        className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                        onClick={handleCreateEvent}
+                      >
+                        {editingEventId ? 'Update Event' : 'Create Event'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        type="button"
+                        onClick={() => {
+                          setEditingEventId(null); // ✅ reset editing if any
+                          setForm({
+                            title: '',
+                            category: '',
+                            date: '',
+                            time: '',
+                            location: '',
+                            spots: '',
+                            image: '',
+                            description: '',
+                            organizerName: '',
+                            organizerRole: '',
+                            organizerAvatar: '',
+                            agendaText: '',
+                            requirementsText: '',
+                            whosComingText: '',
+                          });
+                        }}
+                      >
+                        {editingEventId ? 'Cancel Edit' : 'Clear Form'}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               </Card>
@@ -1410,82 +1544,83 @@ export default function AdminDashboard() {
                 ) : (
                   <div className="space-y-4">
                     {events.map((event) => (
-                    <Card
-                      key={event.id}
-                      className="p-4 bg-background/50 border-border hover:border-primary/50 transition-all"
-                    >
-                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h4 className="font-semibold text-lg">
-                              {event.title}
-                            </h4>
-                            <Badge
-                              variant={
-                                event.status === 'Scheduled'
-                                  ? 'default'
-                                  : 'secondary'
-                              }
-                            >
-                              {event.status}
-                            </Badge>
-                            {event.category && (
-                              <Badge variant="outline">
-                                {event.category}
+                      <Card
+                        key={event.id}
+                        className="p-4 bg-background/50 border-border hover:border-primary/50 transition-all"
+                      >
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <h4 className="font-semibold text-lg">
+                                {event.title}
+                              </h4>
+                              <Badge
+                                variant={
+                                  event.status === 'Scheduled'
+                                    ? 'default'
+                                    : 'secondary'
+                                }
+                              >
+                                {event.status}
                               </Badge>
-                            )}
+                              {event.category && (
+                                <Badge variant="outline">
+                                  {event.category}
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex flex-wrap gap-4 text-sm text-foreground/60">
+                              <span className="flex items-center gap-1">
+                                <Calendar className="h-4 w-4" />
+                                {event.date}
+                              </span>
+                              <span className="flex items-center gap-1">
+                                <Clock className="h-4 w-4" />
+                                {event.time}
+                              </span>
+                              <span>{event.location}</span>
+                              <span className="flex items-center gap-1">
+                                <Users className="h-4 w-4" />
+                                {event.attendees} attendees
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex flex-wrap gap-4 text-sm text-foreground/60">
-                            <span className="flex items-center gap-1">
-                              <Calendar className="h-4 w-4" />
-                              {event.date}
-                            </span>
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-4 w-4" />
-                              {event.time}
-                            </span>
-                            <span>{event.location}</span>
-                            <span className="flex items-center gap-1">
-                              <Users className="h-4 w-4" />
-                              {event.attendees} attendees
-                            </span>
-                          </div>
-                        </div>
-                        <div className="flex gap-2">
-                          <Link href={`/member/events/${event.id}`}>
+                          <div className="flex gap-2">
+                            <Link href={`/member/events/${event.id}`}>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-2 bg-transparent"
+                              >
+                                <Eye className="h-4 w-4" />
+                                View
+                              </Button>
+                            </Link>
                             <Button
                               size="sm"
                               variant="outline"
                               className="gap-2 bg-transparent"
+                              onClick={() => startEditingEvent(event)} // ✅ NEW
                             >
-                              <Eye className="h-4 w-4" />
-                              View
+                              <Edit className="h-4 w-4" />
+                              Edit
                             </Button>
-                          </Link>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="gap-2 bg-transparent"
-                          >
-                            <Edit className="h-4 w-4" />
-                            Edit
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="gap-2 hover:text-destructive hover:border-destructive bg-transparent"
-                            onClick={() =>
-                              setEvents((prev) =>
-                                prev.filter((e) => e.id !== event.id),
-                              )
-                            }
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            Delete
-                          </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-2 hover:text-destructive hover:border-destructive bg-transparent"
+                              onClick={() =>
+                                setEvents((prev) =>
+                                  prev.filter((e) => e.id !== event.id)
+                                )
+                              }
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              Delete
+                            </Button>
+                          </div>
                         </div>
-                      </div>
-                    </Card>
+                      </Card>
                     ))}
                   </div>
                 )}
