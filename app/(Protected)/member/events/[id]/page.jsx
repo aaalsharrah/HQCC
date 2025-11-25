@@ -141,9 +141,64 @@ const eventsData = {
       },
     ],
   },
+  3: {
+    id: 3,
+    title: 'Quantum Hackathon 2024',
+    date: '2024-03-10',
+    time: '9:00 AM - 6:00 PM',
+    location: 'Computer Science Building',
+    attendees: 80,
+    category: 'Hackathon',
+    description:
+      '24-hour quantum computing hackathon with prizes, mentorship, and team-based challenges focused on real-world quantum applications.',
+    image: '/hackathon-coding.jpg',
+    spots: 100,
+    organizer: {
+      name: 'Abdallah Aisharrah',
+      role: 'Founder & President',
+      avatar: '/professional-man.jpg',
+    },
+    agenda: [
+      { time: '9:00 AM', title: 'Check-in & Breakfast', duration: '60 min' },
+      { time: '10:00 AM', title: 'Kickoff & Rules', duration: '30 min' },
+      { time: '10:30 AM', title: 'Team Formation & Ideation', duration: '60 min' },
+      { time: '11:30 AM', title: 'Hacking Session', duration: '5 hrs' },
+      { time: '4:30 PM', title: 'Project Demos', duration: '60 min' },
+      { time: '5:30 PM', title: 'Judging & Awards', duration: '30 min' },
+    ],
+    requirements: [
+      'Laptop with development tools installed',
+      'GitHub account',
+      'Basic programming experience',
+      'Interest in quantum computing and problem solving',
+    ],
+    attendeesList: [
+      {
+        name: 'Sarah Chen',
+        avatar: '/serene-asian-woman.png',
+        role: 'CS Senior',
+      },
+      {
+        name: 'Marcus Johnson',
+        avatar: '/thoughtful-man.png',
+        role: 'Physics Junior',
+      },
+      {
+        name: 'Emily Rodriguez',
+        avatar: '/confident-latina-woman.png',
+        role: 'Math Sophomore',
+      },
+      {
+        name: 'David Kim',
+        avatar: '/thoughtful-asian-man.png',
+        role: 'CS Junior',
+      },
+    ],
+  },
 };
 
 export default function EventDetailPage({ params }) {
+  // params.id is a string ('1', '2', '3') – JS will coerce it to the right key
   const event = eventsData[params.id];
   const [isRegistered, setIsRegistered] = useState(false);
   const [showRSVP, setShowRSVP] = useState(false);

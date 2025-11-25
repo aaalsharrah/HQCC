@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Calendar, Clock, MapPin, Users, ArrowRight } from 'lucide-react';
 import Image from 'next/image';
 import { useState } from 'react';
+import Link from 'next/link';
 
 const upcomingEvents = [
   {
@@ -247,10 +248,12 @@ export default function EventsPage() {
                     {/* Action Button */}
                     <div className="pt-4">
                       {activeTab === 'upcoming' ? (
-                        <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground group/btn">
-                          Register Now
-                          <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover/btn:translate-x-1" />
-                        </Button>
+                        <Link href={`/member/events/${event.id}`}>
+                          <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground group/btn">
+                            Register Now
+                            <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover/btn:translate-x-1" />
+                          </Button>
+                        </Link>
                       ) : event.recording ? (
                         <Button
                           variant="outline"

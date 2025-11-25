@@ -96,33 +96,33 @@ export default function AdminDashboard() {
     },
   ];
 
-  // Sample event data
+  // Sample event data (ids match member events + detail page)
   const events = [
     {
       id: 1,
       title: 'Quantum Computing Workshop',
-      date: '2024-01-15',
-      time: '2:00 PM',
-      location: 'Tech Lab 204',
-      attendees: 35,
+      date: '2024-02-15',
+      time: '6:00 PM - 8:00 PM',
+      location: 'Engineering Lab 201',
+      attendees: 45,
       status: 'Scheduled',
     },
     {
       id: 2,
-      title: 'Industry Speaker Series',
-      date: '2024-01-22',
-      time: '4:00 PM',
-      location: 'Auditorium A',
-      attendees: 42,
+      title: 'Guest Lecture: IBM Quantum',
+      date: '2024-02-22',
+      time: '7:00 PM - 9:00 PM',
+      location: 'Auditorium Hall A',
+      attendees: 120,
       status: 'Scheduled',
     },
     {
       id: 3,
-      title: 'Hackathon Kickoff',
-      date: '2024-02-05',
-      time: '10:00 AM',
-      location: 'Student Center',
-      attendees: 28,
+      title: 'Quantum Hackathon 2024',
+      date: '2024-03-10',
+      time: '9:00 AM - 6:00 PM',
+      location: 'Computer Science Building',
+      attendees: 80,
       status: 'Draft',
     },
   ];
@@ -591,6 +591,7 @@ export default function AdminDashboard() {
                           </div>
                         </div>
                         <div className="flex gap-2">
+                          {/* 🔗 View -> member event detail */}
                           <Link href={`/member/events/${event.id}`}>
                             <Button
                               size="sm"
