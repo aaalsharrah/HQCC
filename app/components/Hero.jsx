@@ -1,8 +1,9 @@
-"use client"
+'use client';
 
-import { Button } from "@/components/ui/button"
-import { ArrowRight, Sparkles } from "lucide-react"
-import Quantum3DBackground from "./Quantum-3d-Background"
+import { Button } from '@/components/ui/button';
+import { ArrowRight, Sparkles } from 'lucide-react';
+import Quantum3DBackground from './Quantum-3d-Background';
+import Link from 'next/link';
 
 export function Hero() {
   return (
@@ -14,7 +15,9 @@ export function Hero() {
       <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center pt-20 ">
         <div className="inline-flex items-center gap-2 bg-card/50 backdrop-blur-sm px-4 py-2 rounded-full mb-8 border border-border">
           <Sparkles className="w-4 h-4 text-primary" />
-          <span className="text-sm font-medium text-foreground">Hofstra University</span>
+          <span className="text-sm font-medium text-foreground">
+            Hofstra University
+          </span>
         </div>
 
         <h1 className="text-5xl sm:text-7xl lg:text-8xl font-bold tracking-tight mb-6 text-balance">
@@ -29,7 +32,8 @@ export function Hero() {
         </p>
 
         <p className="text-lg sm:text-xl text-foreground/60 mb-12 max-w-3xl mx-auto leading-relaxed">
-          Dive into the frontier of quantum computing with like-minded peers and pioneering mentors.
+          Dive into the frontier of quantum computing with like-minded peers and
+          pioneering mentors.
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -38,10 +42,10 @@ export function Hero() {
             size="lg"
             className="bg-primary hover:bg-primary/90 text-primary-foreground text-lg px-8 py-6 rounded-xl group transition-all hover:scale-105"
           >
-            <a href="#join" className="flex items-center gap-2">
+            <Link href={'/signup'} className="flex items-center gap-2">
               Join the Club
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </a>
+            </Link>
           </Button>
           <Button
             asChild
@@ -60,5 +64,5 @@ export function Hero() {
         </div>
       </div>
     </section>
-  )
+  );
 }
