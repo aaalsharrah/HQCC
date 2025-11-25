@@ -159,7 +159,7 @@ export default function SignUpPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center py-12">
+    <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center mt-15 py-12">
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute w-96 h-96 -top-48 -left-48 bg-primary/20 rounded-full blur-3xl animate-float-gentle" />
         <div className="absolute w-96 h-96 top-1/4 -right-48 bg-accent/20 rounded-full blur-3xl animate-float-gentle [animation-delay:2s]" />
