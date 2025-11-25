@@ -1,4 +1,3 @@
-
 import { About } from '../components/About';
 import { Activities } from '../components/Activities';
 import { Hero } from '../components/Hero';
