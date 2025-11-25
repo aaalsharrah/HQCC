@@ -181,7 +181,7 @@ export default function NotificationsPage() {
               </div>
             ) : (
               filteredNotifications.map((notification) => (
-              <div
+                <div
                 key={notification.id}
                 className={`group relative bg-card/50 backdrop-blur-xl rounded-xl p-5 border transition-all hover:bg-card/70 hover:shadow-lg hover:scale-[1.01] ${
                   notification.read
@@ -248,6 +248,20 @@ export default function NotificationsPage() {
                             View {notification.type === 'event' ? 'event' : notification.type === 'message' ? 'conversation' : 'post'}
                           </button>
                         )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* UNREAD DOT */}
+                  {!notification.read && (
+                    <div className="shrink-0">
+                      <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                    </div>
+                  )}
+                </div>
+              </div>
+              ))
+            )}
           </div>
 
           {/* EMPTY STATE */}

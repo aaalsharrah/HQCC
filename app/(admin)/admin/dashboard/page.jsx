@@ -19,6 +19,27 @@ import {
   CheckCircle2,
   XCircle,
   Loader2,
+} from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import Link from 'next/link';
+import { db, auth } from '@/app/lib/firebase/firebase';
+import {
+  collection,
+  getDocs,
+  doc,
+  getDoc,
+  Timestamp,
+  addDoc,
+  query,
+  where,
+  orderBy,
+} from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
+import { createNotification } from '@/app/lib/firebase/notifications';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');

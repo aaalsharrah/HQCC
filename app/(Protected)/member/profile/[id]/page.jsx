@@ -20,7 +20,25 @@ import {
   MoreHorizontal,
   Send,
   Loader2,
-// Add this NEW helper:
+} from 'lucide-react';
+import { auth, db, storage } from '@/app/lib/firebase/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import {
+  doc,
+  getDoc,
+  collection,
+  query,
+  where,
+  orderBy,
+  getDocs,
+  setDoc,
+  Timestamp,
+} from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { findOrCreateConversation } from '@/app/lib/firebase/messages';
+import { toggleLike } from '@/app/lib/firebase/post';
+
+// Helper function to get reply count
 async function getReplyCount(postId) {
   const repliesRef = collection(db, 'posts', postId, 'replies');
   const snap = await getDocs(repliesRef);
@@ -86,9 +104,27 @@ export default function ProfilePage() {
               return;
             }
 
-              coverImage:
-                data.coverImage ||
-                '/quantum-computing-chip-with-glowing-circuits-and-b.jpg',
+            // Create default profile for own profile if it doesn't exist
+            loadedProfile = {
+              name: user.displayName || user.email?.split('@')[0] || 'Member',
+              username: user.email?.split('@')[0] || 'member',
+              avatar: user.photoURL || null,
+              coverImage: '/quantum-computing-chip-with-glowing-circuits-and-b.jpg',
+              bio: 'HQCC member | Quantum & Computing Enthusiast',
+              location: 'Hempstead, NY',
+              website: 'hqcc.hofstra.edu',
+              joined: new Date(),
+            };
+          } else {
+            // Document exists, load the profile data
+            const data = snap.data();
+            const joinedDate = data.joinedAt?.toDate?.() || data.createdAt?.toDate?.() || new Date();
+            
+            loadedProfile = {
+              name: data.name || user.displayName || user.email?.split('@')[0] || 'Member',
+              username: data.username || data.email?.split('@')[0] || 'member',
+              avatar: data.avatar || user.photoURL || null,
+              coverImage: data.coverImage || '/quantum-computing-chip-with-glowing-circuits-and-b.jpg',
               bio: data.bio || 'HQCC member | Quantum & Computing Enthusiast',
               location: data.location || 'Hempstead, NY',
               website: data.website || 'hqcc.hofstra.edu',
@@ -171,6 +207,16 @@ export default function ProfilePage() {
               }
             }
 
+            userPosts.push({
+              id: docSnap.id,
+              content: data.content || '',
+              timestamp: data.createdAt
+                ? data.createdAt.toDate().toLocaleString()
+                : 'Just now',
+              likes: data.likesCount ?? 0,
+              comments: replyCount,
+              shares: data.sharesCount ?? 0,
+              isLiked,
               isBookmarked: false,
               image: data.imageUrl || null,
             });
@@ -357,6 +403,33 @@ export default function ProfilePage() {
       );
       alert('Failed to like post. Please try again.');
     }
+  };
+
+  const handleBookmark = (postId, postsArray, setPostsArray) => {
+    setPostsArray(
+      postsArray.map((post) =>
+        post.id === postId
+          ? { ...post, isBookmarked: !post.isBookmarked }
+          : post
+      )
+    );
+  };
+
+  const handleSendMessage = async () => {
+    if (!currentUserId || !profileId) return;
+    
+    setSendingMessage(true);
+    try {
+      const conversationId = await findOrCreateConversation(currentUserId, profileId);
+      router.push(`/member/messages/${conversationId}`);
+    } catch (err) {
+      console.error('Error starting conversation:', err);
+      alert('Failed to start conversation. Please try again.');
+    } finally {
+      setSendingMessage(false);
+    }
+  };
+
   // Save profile changes (text fields + avatar + cover photo)
   const handleSaveProfile = async (e) => {
     e.preventDefault();
@@ -623,22 +696,36 @@ export default function ProfilePage() {
     );
   }
 
-              <div className="absolute inset-0 flex items-center justify-center bg-black/30">
-                <label className="bg-background/80 px-4 py-2 rounded-md text-sm cursor-pointer hover:bg-background">
-                  Change cover photo
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-            )}
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Cover Image */}
+      <div className="relative h-48 md:h-64 bg-gradient-to-r from-primary/20 via-accent/20 to-secondary/20">
+        {profile.coverImage && (
+          <Image
+            src={profile.coverImage}
+            alt="Cover"
+            fill
+            className="object-cover"
+            priority
+          />
+        )}
+        {isCurrentUserProfile && (
+          <div className="absolute inset-0 flex items-center justify-center bg-black/30">
+            <label className="bg-background/80 px-4 py-2 rounded-md text-sm cursor-pointer hover:bg-background">
+              Change cover photo
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => setCoverFile(e.target.files?.[0] || null)}
+                className="hidden"
+              />
+            </label>
           </div>
+        )}
+      </div>
 
-          {/* Add top padding so content starts below avatar */}
-          <div className="relative px-6 pb-6 pt-20 md:pt-24">
+      {/* Add top padding so content starts below avatar */}
+      <div className="relative px-6 pb-6 pt-20 md:pt-24">
             {/* Avatar */}
             <div className="absolute -top-16 md:-top-20">
               <Avatar className="h-32 w-32 md:h-40 md:w-40 ring-4 ring-card border-4 border-background">
@@ -690,6 +777,7 @@ export default function ProfilePage() {
             </div>
 
             {/* Profile Info / Edit Form */}
+            <Card className="p-6 bg-card/50 backdrop-blur-xl border-border/50">
             {!isEditing ? (
               <div className="mt-4">
                 <h1 className="text-3xl font-bold text-foreground mb-1">
@@ -898,10 +986,10 @@ export default function ProfilePage() {
                 </div>
               </form>
             )}
+            </Card>
           </div>
-        </Card>
 
-        {/* Tabs */}
+      {/* Tabs */}
         <Tabs defaultValue="posts" className="space-y-6">
           <TabsList className="w-full bg-card/50 backdrop-blur-xl border border-border/50 p-1">
             <TabsTrigger
@@ -1021,7 +1109,6 @@ export default function ProfilePage() {
             )}
           </TabsContent>
         </Tabs>
-      </main>
     </div>
   );
 }

@@ -64,7 +64,6 @@ export default function MessagesPage() {
 
     return () => unsubscribe();
   }, []);
-  );
 
   return (
     <div className="min-h-screen bg-background">

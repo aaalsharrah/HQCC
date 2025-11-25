@@ -12,29 +12,80 @@ import {
   setDoc,
   deleteDoc,
   getDoc,
+  getDocs,
 } from 'firebase/firestore';
 import { db } from '@/app/lib/firebase/firebase';
 import { createNotification } from './notifications';
-      return {
-        id: d.id,
-        authorId: data.authorId,
-        authorEmail: data.authorEmail,
-        authorName: data.authorName,
-        content: data.content,
-        createdAt: data.createdAt,
-        likesCount: data.likesCount ?? 0,
-        imageUrl: data.imageUrl || null,
 
-        // UI-only fields
-        isLiked,
-        isBookmarked: false,
-        timestamp: data.createdAt
-          ? data.createdAt.toDate().toLocaleString()
-          : 'Just now',
-      };
-    });
+const POSTS_COLLECTION = 'posts';
 
-    const posts = await Promise.all(postsPromises);
+/**
+ * Subscribe to all posts with real-time updates
+ * @param {function} callback - Callback function that receives posts array
+ * @param {string} userId - Optional current user ID to check if posts are liked
+ * @returns {function} Unsubscribe function
+ */
+export function subscribeToPosts(callback, userId = null) {
+  const postsRef = collection(db, POSTS_COLLECTION);
+  const q = query(postsRef, orderBy('createdAt', 'desc'));
+
+  return onSnapshot(
+    q,
+    async (snapshot) => {
+      const postsPromises = snapshot.docs.map(async (d) => {
+        const data = d.data();
+
+        // Check if current user has liked this post
+        let isLiked = false;
+        if (userId) {
+          try {
+            const likeRef = doc(db, POSTS_COLLECTION, d.id, 'likes', userId);
+            const likeSnap = await getDoc(likeRef);
+            isLiked = likeSnap.exists();
+          } catch (err) {
+            console.error('Error checking like status:', err);
+          }
+        }
+
+        return {
+          id: d.id,
+          authorId: data.authorId,
+          authorEmail: data.authorEmail,
+          authorName: data.authorName,
+          authorAvatar: data.authorAvatar || null,
+          content: data.content,
+          createdAt: data.createdAt,
+          likesCount: data.likesCount ?? 0,
+          imageUrl: data.imageUrl || null,
+
+          // UI-only fields
+          isLiked,
+          isBookmarked: false,
+          timestamp: data.createdAt
+            ? data.createdAt.toDate().toLocaleString()
+            : 'Just now',
+        };
+      });
+
+      const posts = await Promise.all(postsPromises);
+      callback(posts);
+    },
+    (error) => {
+      console.error('Error subscribing to posts:', error);
+      callback([]);
+    }
+  );
+}
+
+/**
+ * Create a new post
+ * @param {Object} postData - Post data
+ * @param {string} postData.content - Post content
+ * @param {Object} postData.user - Current user object
+ * @param {string} postData.imageUrl - Optional image URL
+ * @returns {Promise<Object>} Created post object
+ */
+export async function createPost({ content, user, imageUrl = null }) {
   if (!user) throw new Error('User must be logged in to create a post');
 
   const postsRef = collection(db, POSTS_COLLECTION);
@@ -102,6 +153,17 @@ export function subscribeToPost(postId, callback, userId = null) {
       }
     }
 
+    const post = {
+      id: snap.id,
+      authorId: data.authorId,
+      authorEmail: data.authorEmail,
+      authorName: data.authorName,
+      authorAvatar: data.authorAvatar || null,
+      content: data.content,
+      createdAt: data.createdAt,
+      likesCount: data.likesCount ?? 0,
+      imageUrl: data.imageUrl || null,
+      isLiked,
       isBookmarked: false,
       timestamp: data.createdAt
         ? data.createdAt.toDate().toLocaleString()
@@ -202,6 +264,73 @@ export async function createReply({ postId, content, user }) {
     // Don't fail the reply operation if notification creation fails
     console.error('Error creating reply notification:', error);
   }
-    return true; // now liked
+}
+
+/**
+ * 🔑 New: Toggle like for a post, one per user
+ * stores likes in: posts/{postId}/likes/{userId}
+ */
+export async function toggleLike(postId, userId) {
+  const likeRef = doc(db, POSTS_COLLECTION, postId, 'likes', userId);
+  const postRef = doc(db, POSTS_COLLECTION, postId);
+
+  const snap = await getDoc(likeRef);
+
+  if (!snap.exists()) {
+    // Like the post
+    await setDoc(likeRef, {
+      userId,
+      createdAt: serverTimestamp(),
+    });
+
+    // Increment likesCount
+    await updateDoc(postRef, {
+      likesCount: increment(1),
+    });
+
+    // Create notification for post author
+    try {
+      const postSnap = await getDoc(postRef);
+      if (postSnap.exists()) {
+        const postData = postSnap.data();
+        const postAuthorId = postData.authorId;
+
+        if (postAuthorId && postAuthorId !== userId) {
+          const actorRef = doc(db, 'members', userId);
+          const actorSnap = await getDoc(actorRef);
+
+          let actorName = 'Someone';
+          let actorAvatar = null;
+
+          if (actorSnap.exists()) {
+            const actorData = actorSnap.data();
+            actorName = actorData.name || actorData.email?.split('@')[0] || 'Someone';
+            actorAvatar = actorData.avatar || null;
+          }
+
+          await createNotification({
+            userId: postAuthorId,
+            type: 'like',
+            actorId: userId,
+            actorName,
+            actorAvatar,
+            postId,
+            postContent: postData.content || null,
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error creating like notification:', error);
+    }
+    return true;
+  } else {
+    // Unlike the post
+    await deleteDoc(likeRef);
+
+    // Decrement likesCount
+    await updateDoc(postRef, {
+      likesCount: increment(-1),
+    });
+    return false;
   }
 }
