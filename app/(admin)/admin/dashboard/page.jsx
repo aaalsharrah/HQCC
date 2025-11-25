@@ -24,6 +24,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import Link from 'next/link';
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -590,14 +591,16 @@ export default function AdminDashboard() {
                           </div>
                         </div>
                         <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="gap-2 bg-transparent"
-                          >
-                            <Eye className="h-4 w-4" />
-                            View
-                          </Button>
+                          <Link href={`/member/events/${event.id}`}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="gap-2 bg-transparent"
+                            >
+                              <Eye className="h-4 w-4" />
+                              View
+                            </Button>
+                          </Link>
                           <Button
                             size="sm"
                             variant="outline"
