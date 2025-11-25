@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState, use } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useParams } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -19,10 +19,10 @@ import {
   toggleLike,
 } from '@/app/lib/firebase/post';
 
-export default function PostThreadPage(props) {
-  const params = use(props.params);
-  const { id } = params; // post id
+export default function PostThreadPage() {
   const router = useRouter();
+  const params = useParams();
+  const id = params?.id; // post id (string)
 
   const [currentUser, setCurrentUser] = useState(null);
   const [post, setPost] = useState(null);
@@ -31,32 +31,43 @@ export default function PostThreadPage(props) {
   const [replyText, setReplyText] = useState('');
   const [postingReply, setPostingReply] = useState(false);
 
-  // Listen to auth
+  // 🔹 Listen to auth & enforce sign-in
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user || null);
+      if (!user) {
+        setCurrentUser(null);
+        setLoading(false);
+        router.push('/signin');
+        return;
+      }
+      setCurrentUser(user);
     });
+
     return () => unsub();
-  }, []);
+  }, [router]);
 
-      // Subscribe to the post + replies
-      useEffect(() => {
-        if (!id || !currentUser) return;
+  // 🔹 Subscribe to the post + replies
+  useEffect(() => {
+    if (!id || !currentUser?.uid) return;
 
-        const unsubPost = subscribeToPost(id, (fetchedPost) => {
-          setPost(fetchedPost);
-          setLoading(false);
-        }, currentUser.uid);
+    const unsubPost = subscribeToPost(
+      id,
+      (fetchedPost) => {
+        setPost(fetchedPost);
+        setLoading(false);
+      },
+      currentUser.uid
+    );
 
     const unsubReplies = subscribeToReplies(id, (fetchedReplies) => {
       setReplies(fetchedReplies);
     });
 
     return () => {
-      unsubPost && unsubPost();
-      unsubReplies && unsubReplies();
+      unsubPost?.();
+      unsubReplies?.();
     };
-  }, [id]);
+  }, [id, currentUser?.uid]);
 
   const handleLike = async () => {
     if (!post || !currentUser) {
@@ -77,7 +88,6 @@ export default function PostThreadPage(props) {
         : prev
     );
 
-    // Firestore toggle (one like per user)
     try {
       await toggleLike(id, currentUser.uid);
     } catch (err) {
@@ -175,7 +185,7 @@ export default function PostThreadPage(props) {
             <div className="flex-1">
               <div className="flex flex-wrap items-center gap-2 mb-1">
                 <Link
-                  href={`/profile/${post.authorId}`}
+                  href={`/member/profile/${post.authorId}`}
                   className="font-semibold text-foreground hover:underline"
                 >
                   {post.authorName || 'Member'}
@@ -187,15 +197,11 @@ export default function PostThreadPage(props) {
                   Member
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {post.timestamp}
-              </p>
+              <p className="text-xs text-muted-foreground">{post.timestamp}</p>
             </div>
           </div>
 
-          <p className="text-foreground mb-4 leading-relaxed">
-            {post.content}
-          </p>
+          <p className="text-foreground mb-4 leading-relaxed">{post.content}</p>
 
           <div className="flex items-center justify-between pt-4 border-t border-border/50">
             <Button
@@ -209,9 +215,7 @@ export default function PostThreadPage(props) {
               }`}
             >
               <Heart
-                className={`h-5 w-5 ${
-                  post.isLiked ? 'fill-current' : ''
-                }`}
+                className={`h-5 w-5 ${post.isLiked ? 'fill-current' : ''}`}
               />
               <span className="text-sm">{post.likesCount ?? 0}</span>
             </Button>
@@ -241,9 +245,7 @@ export default function PostThreadPage(props) {
                 value={replyText}
                 onChange={(e) => setReplyText(e.target.value)}
                 placeholder={
-                  currentUser
-                    ? 'Reply to this post...'
-                    : 'Log in to reply...'
+                  currentUser ? 'Reply to this post...' : 'Log in to reply...'
                 }
                 disabled={!currentUser || postingReply}
                 className="w-full bg-transparent border-none outline-none resize-none text-foreground placeholder:text-muted-foreground min-h-[60px]"
@@ -251,9 +253,7 @@ export default function PostThreadPage(props) {
               <div className="flex justify-end mt-2">
                 <Button
                   onClick={handleReply}
-                  disabled={
-                    !replyText.trim() || !currentUser || postingReply
-                  }
+                  disabled={!replyText.trim() || !currentUser || postingReply}
                   className="bg-primary hover:bg-primary/90 text-primary-foreground"
                   size="sm"
                 >
@@ -272,23 +272,18 @@ export default function PostThreadPage(props) {
             </p>
           ) : (
             replies.map((reply) => (
-              <Card
-                key={reply.id}
-                className="p-4 bg-card/40 border-border/50"
-              >
+              <Card key={reply.id} className="p-4 bg-card/40 border-border/50">
                 <div className="flex items-start gap-3">
                   <Avatar className="h-9 w-9 ring-2 ring-primary/10">
                     <AvatarImage src="/diverse-user-avatars.png" />
                     <AvatarFallback>
-                      {reply.authorName
-                        ? reply.authorName.slice(0, 2)
-                        : 'HQ'}
+                      {reply.authorName ? reply.authorName.slice(0, 2) : 'HQ'}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1">
                     <div className="flex flex-wrap items-center gap-2 mb-1">
                       <Link
-                        href={`/profile/${reply.authorId}`}
+                        href={`/member/profile/${reply.authorId}`}
                         className="font-medium text-sm text-foreground hover:underline"
                       >
                         {reply.authorName || 'Member'}
@@ -299,9 +294,7 @@ export default function PostThreadPage(props) {
                         </span>
                       )}
                     </div>
-                    <p className="text-sm text-foreground">
-                      {reply.content}
-                    </p>
+                    <p className="text-sm text-foreground">{reply.content}</p>
                   </div>
                 </div>
               </Card>

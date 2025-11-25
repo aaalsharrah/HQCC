@@ -25,6 +25,7 @@ import {
   subscribeToPosts,
   toggleLike,
 } from '@/app/lib/firebase/post';
+import Image from 'next/image';
 
 export default function FeedPage() {
   const [posts, setPosts] = useState([]);
@@ -127,7 +128,7 @@ export default function FeedPage() {
     }
 
     setPostImage(file);
-    
+
     // Create preview
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -159,7 +160,10 @@ export default function FeedPage() {
       // Upload image if provided
       if (postImage) {
         try {
-          const imageRef = ref(storage, `posts/${Date.now()}_${postImage.name}`);
+          const imageRef = ref(
+            storage,
+            `posts/${Date.now()}_${postImage.name}`
+          );
           await uploadBytes(imageRef, postImage);
           imageUrl = await getDownloadURL(imageRef);
         } catch (uploadError) {
@@ -219,9 +223,7 @@ export default function FeedPage() {
         <Card className="p-6 mb-6 bg-card/50 backdrop-blur-xl border-border/50">
           <div className="flex gap-4">
             <Avatar className="h-12 w-12 ring-2 ring-primary/20">
-              <AvatarImage
-                src={currentUser?.photoURL || '/images.jpeg'}
-              />
+              <AvatarImage src={currentUser?.photoURL || '/images.jpeg'} />
               <AvatarFallback>
                 {currentUser?.displayName
                   ? currentUser.displayName.slice(0, 2)
@@ -240,14 +242,16 @@ export default function FeedPage() {
                 disabled={!currentUser || posting}
                 className="w-full bg-transparent border-none outline-none resize-none text-foreground placeholder:text-muted-foreground min-h-20"
               />
-              
+
               {/* Image Preview */}
               {imagePreview && (
-                <div className="mt-3 relative">
-                  <img
-                    src={imagePreview}
+                <div className="relative w-full h-64">
+                  <Image
+                    src={imagePreview || '/placeholder.svg'}
                     alt="Post preview"
-                    className="w-full max-h-64 object-cover rounded-lg border border-border/50"
+                    fill
+                    className="object-cover rounded-lg border border-border/50"
+                    unoptimized={imagePreview?.startsWith('http')}
                   />
                   <Button
                     variant="ghost"
@@ -261,7 +265,7 @@ export default function FeedPage() {
               )}
 
               <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/50">
-                  <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
                   <input
                     type="file"
                     accept="image/*"
@@ -346,15 +350,16 @@ export default function FeedPage() {
 
                 {/* Post image */}
                 {post.imageUrl ? (
-                  <div className="mb-4 rounded-lg overflow-hidden border border-border/50">
-                    <img
+                  <div className="mb-4 rounded-lg overflow-hidden border border-border/50 relative w-full max-h-96 h-96">
+                    <Image
                       src={post.imageUrl}
                       alt="Post content"
-                      className="w-full h-auto max-h-96 object-cover"
-                      onError={(e) => {
-                        console.error('Image failed to load:', post.imageUrl);
-                        e.target.style.display = 'none';
-                      }}
+                      fill
+                      className="object-cover"
+                      unoptimized // required for Firebase URLs / blob URLs
+                      onError={() =>
+                        console.error('Image failed to load:', post.imageUrl)
+                      }
                     />
                   </div>
                 ) : null}
@@ -377,9 +382,7 @@ export default function FeedPage() {
                           post.isLiked ? 'fill-current' : ''
                         }`}
                       />
-                      <span className="text-sm">
-                        {post.likesCount ?? 0}
-                      </span>
+                      <span className="text-sm">{post.likesCount ?? 0}</span>
                     </Button>
 
                     <Link

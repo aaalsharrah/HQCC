@@ -33,48 +33,74 @@ export default function MessagesPage() {
   });
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    let unsubscribeConversations = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      // User logged out
       if (!user) {
         setCurrentUser(null);
+        setConversations([]);
         setLoading(false);
+
+        if (unsubscribeConversations) {
+          unsubscribeConversations();
+          unsubscribeConversations = null;
+        }
+
+        // optional: redirect to signin or leave as is
+        // router.push('/signin');
         return;
       }
 
+      // User logged in
       setCurrentUser(user);
 
-      // Subscribe to conversations
-      const unsubscribeConversations = subscribeToConversations(
+      // Clean up any existing conversations listener before making a new one
+      if (unsubscribeConversations) {
+        unsubscribeConversations();
+        unsubscribeConversations = null;
+      }
+
+      // Subscribe to conversations for this user
+      unsubscribeConversations = subscribeToConversations(
         user.uid,
         async (conversationsData) => {
-          // For each conversation, get the other user's data
-          const conversationsWithUsers = await Promise.all(
-            conversationsData.map(async (conv) => {
-              const otherUser = await getOtherUser(conv.id, user.uid);
-              return {
-                id: conv.id,
-                name: otherUser?.name || 'Unknown User',
-                email: otherUser?.email || '',
-                avatar: otherUser?.avatar || null,
-                lastMessage: conv.lastMessage || '',
-                lastMessageTime: conv.lastMessageTime,
-                bookTitle: conv.bookTitle || null,
-                sellerId: conv.sellerId || null,
-                bookId: conv.bookId || null,
-              };
-            })
-          );
+          try {
+            // For each conversation, get the other user's data
+            const conversationsWithUsers = await Promise.all(
+              conversationsData.map(async (conv) => {
+                const otherUser = await getOtherUser(conv.id, user.uid);
+                return {
+                  id: conv.id,
+                  name: otherUser?.name || 'Unknown User',
+                  email: otherUser?.email || '',
+                  avatar: otherUser?.avatar || null,
+                  lastMessage: conv.lastMessage || '',
+                  lastMessageTime: conv.lastMessageTime,
+                  bookTitle: conv.bookTitle || null,
+                  sellerId: conv.sellerId || null,
+                  bookId: conv.bookId || null,
+                };
+              })
+            );
 
-          setConversations(conversationsWithUsers);
-          setLoading(false);
+            setConversations(conversationsWithUsers);
+            setLoading(false);
+          } catch (err) {
+            console.error('Error processing conversations:', err);
+            setLoading(false);
+          }
         }
       );
-
-      return () => {
-        unsubscribeConversations();
-      };
     });
 
-    return () => unsubscribe();
+    // Cleanup when component unmounts
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeConversations) {
+        unsubscribeConversations();
+      }
+    };
   }, []);
 
   return (
@@ -108,7 +134,9 @@ export default function MessagesPage() {
               <div className="flex flex-col items-center justify-center py-16 px-4">
                 <Send className="h-16 w-16 text-muted-foreground/50 mb-4" />
                 <h3 className="text-lg font-semibold mb-2">
-                  {searchQuery ? 'No conversations found' : 'No conversations yet'}
+                  {searchQuery
+                    ? 'No conversations found'
+                    : 'No conversations yet'}
                 </h3>
                 <p className="text-sm text-muted-foreground text-center">
                   {searchQuery

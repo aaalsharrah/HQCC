@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ArrowLeft, Send, Loader2, CheckCircle2 } from 'lucide-react';
-import { auth } from '@/app/lib/firebase/firebase';
+import { auth, db } from '@/app/lib/firebase/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   subscribeToMessages,
@@ -14,7 +14,6 @@ import {
   formatTimestamp,
   deleteConversation,
 } from '@/app/lib/firebase/messages';
-import { db } from '@/app/lib/firebase/firebase';
 import { doc, getDoc, deleteDoc } from 'firebase/firestore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
@@ -22,6 +21,7 @@ export default function MessageDetailPage() {
   const router = useRouter();
   const params = useParams();
   const conversationId = params?.id;
+
   const messagesEndRef = useRef(null);
   const scrollContainerRef = useRef(null);
 
@@ -33,7 +33,7 @@ export default function MessageDetailPage() {
   const [otherUser, setOtherUser] = useState(null);
   const [conversationData, setConversationData] = useState(null);
 
-  // Scroll to bottom when messages change
+  // Auto-scroll when messages change
   useEffect(() => {
     if (messagesEndRef.current && scrollContainerRef.current) {
       scrollContainerRef.current.scrollTo({
@@ -44,12 +44,26 @@ export default function MessageDetailPage() {
   }, [messages]);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    let unsubscribeMessages = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (user) => {
+      // 🔐 User logged out
       if (!user) {
+        setCurrentUser(null);
+        setMessages([]);
+        setConversationData(null);
+        setOtherUser(null);
+
+        if (unsubscribeMessages) {
+          unsubscribeMessages();
+          unsubscribeMessages = null;
+        }
+
         router.push('/signin');
         return;
       }
 
+      // 🔐 User logged in
       setCurrentUser(user);
 
       if (!conversationId) {
@@ -58,11 +72,13 @@ export default function MessageDetailPage() {
       }
 
       try {
-        // Get conversation data
+        // Fetch conversation document
         const conversationRef = doc(db, 'conversations', conversationId);
         const conversationSnap = await getDoc(conversationRef);
 
         if (!conversationSnap.exists()) {
+          setConversationData(null);
+          setOtherUser(null);
           setLoading(false);
           return;
         }
@@ -73,29 +89,37 @@ export default function MessageDetailPage() {
         };
         setConversationData(convData);
 
-        // Get other user's data
+        // Load other participant data
         const other = await getOtherUser(conversationId, user.uid);
         setOtherUser(other);
 
-        // Subscribe to messages
-        const unsubscribeMessages = subscribeToMessages(
+        // Clean up any previous messages listener before creating a new one
+        if (unsubscribeMessages) {
+          unsubscribeMessages();
+          unsubscribeMessages = null;
+        }
+
+        // Subscribe to messages for this conversation
+        unsubscribeMessages = subscribeToMessages(
           conversationId,
           (messagesData) => {
             setMessages(messagesData);
             setLoading(false);
           }
         );
-
-        return () => {
-          unsubscribeMessages();
-        };
       } catch (error) {
         console.error('Error loading conversation:', error);
         setLoading(false);
       }
     });
 
-    return () => unsubscribe();
+    // Cleanup when component unmounts OR conversationId changes
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeMessages) {
+        unsubscribeMessages();
+      }
+    };
   }, [conversationId, router]);
 
   const handleSendMessage = async (text = null) => {
@@ -141,10 +165,7 @@ export default function MessageDetailPage() {
       // Delete conversation
       await deleteConversation(conversationId);
 
-      // Show success message
       alert('Transaction completed!');
-
-      // Navigate back to messages
       router.push('/member/messages');
     } catch (error) {
       console.error('Error confirming purchase:', error);
@@ -251,9 +272,9 @@ export default function MessageDetailPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Message Input */}
+      {/* Footer / Input */}
       <div className="border-t border-border bg-card/50 backdrop-blur-xl p-4 space-y-4">
-        {/* Confirmed button for seller */}
+        {/* Confirm button for seller */}
         {isSeller && conversationData.bookId && (
           <Button
             onClick={handleConfirmPurchase}

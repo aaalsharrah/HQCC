@@ -21,6 +21,7 @@ import {
   Send,
   Loader2,
 } from 'lucide-react';
+
 import { auth, db, storage } from '@/app/lib/firebase/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
@@ -32,13 +33,30 @@ import {
   orderBy,
   getDocs,
   setDoc,
-  Timestamp,
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { findOrCreateConversation } from '@/app/lib/firebase/messages';
 import { toggleLike } from '@/app/lib/firebase/post';
 
-// Helper function to get reply count
+// Helper: validate avatar/cover files before upload
+function validateFile(file, type = 'image') {
+  if (!file) return null;
+
+  const maxSize = 5 * 1024 * 1024; // 5MB
+  const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+
+  if (!allowedTypes.includes(file.type)) {
+    return `Please upload a valid ${type} image (JPG, PNG, WEBP, or GIF).`;
+  }
+
+  if (file.size > maxSize) {
+    return `${type === 'avatar' ? 'Profile picture' : 'Cover image'} must be smaller than 5MB.`;
+  }
+
+  return null;
+}
+
+// Helper: get reply count for a post
 async function getReplyCount(postId) {
   const repliesRef = collection(db, 'posts', postId, 'replies');
   const snap = await getDocs(repliesRef);
@@ -48,7 +66,7 @@ async function getReplyCount(postId) {
 export default function ProfilePage() {
   const router = useRouter();
   const params = useParams();
-  const profileId = params?.id; // Get the profile ID from route
+  const profileId = params?.id; // profile user id from route
 
   const [profile, setProfile] = useState(null);
   const [posts, setPosts] = useState([]);
@@ -81,22 +99,22 @@ export default function ProfilePage() {
       }
 
       setCurrentUserId(user.uid);
-      
-      // Determine if viewing own profile or another user's profile
+
+      // Who's profile are we viewing?
       const targetUserId = profileId || user.uid;
       const isOwnProfile = targetUserId === user.uid;
       setIsCurrentUserProfile(isOwnProfile);
 
       (async () => {
         try {
-          // 🔹 Load profile from "members" - use targetUserId instead of user.uid
+          // Load profile from "members" using targetUserId
           const refDoc = doc(db, 'members', targetUserId);
           const snap = await getDoc(refDoc);
 
           let loadedProfile;
 
           if (!snap.exists()) {
-            // If viewing another user's profile that doesn't exist, show error
+            // Viewing someone else whose profile doesn't exist
             if (!isOwnProfile) {
               setProfile(null);
               setError('Profile not found');
@@ -104,27 +122,58 @@ export default function ProfilePage() {
               return;
             }
 
-            // Create default profile for own profile if it doesn't exist
+            // Create default profile for own account
             loadedProfile = {
+              uid: targetUserId,
               name: user.displayName || user.email?.split('@')[0] || 'Member',
               username: user.email?.split('@')[0] || 'member',
+              email: user.email || '',
               avatar: user.photoURL || null,
-              coverImage: '/quantum-computing-chip-with-glowing-circuits-and-b.jpg',
+              coverImage:
+                '/quantum-computing-chip-with-glowing-circuits-and-b.jpg',
               bio: 'HQCC member | Quantum & Computing Enthusiast',
               location: 'Hempstead, NY',
               website: 'hqcc.hofstra.edu',
               joined: new Date(),
             };
+
+            // Persist default profile
+            await setDoc(
+              refDoc,
+              {
+                name: loadedProfile.name,
+                username: loadedProfile.username,
+                email: loadedProfile.email,
+                avatar: loadedProfile.avatar,
+                coverImage: loadedProfile.coverImage,
+                bio: loadedProfile.bio,
+                location: loadedProfile.location,
+                website: loadedProfile.website,
+                createdAt: new Date(),
+              },
+              { merge: true }
+            );
           } else {
-            // Document exists, load the profile data
             const data = snap.data();
-            const joinedDate = data.joinedAt?.toDate?.() || data.createdAt?.toDate?.() || new Date();
-            
+            const joinedDate =
+              data.joinedAt?.toDate?.() ||
+              data.createdAt?.toDate?.() ||
+              new Date();
+
             loadedProfile = {
-              name: data.name || user.displayName || user.email?.split('@')[0] || 'Member',
-              username: data.username || data.email?.split('@')[0] || 'member',
+              uid: targetUserId,
+              name:
+                data.name ||
+                user.displayName ||
+                user.email?.split('@')[0] ||
+                'Member',
+              username:
+                data.username || data.email?.split('@')[0] || 'member',
+              email: data.email || user.email || '',
               avatar: data.avatar || user.photoURL || null,
-              coverImage: data.coverImage || '/quantum-computing-chip-with-glowing-circuits-and-b.jpg',
+              coverImage:
+                data.coverImage ||
+                '/quantum-computing-chip-with-glowing-circuits-and-b.jpg',
               bio: data.bio || 'HQCC member | Quantum & Computing Enthusiast',
               location: data.location || 'Hempstead, NY',
               website: data.website || 'hqcc.hofstra.edu',
@@ -134,7 +183,7 @@ export default function ProfilePage() {
 
           setProfile(loadedProfile);
 
-          // 🔹 Initialize edit form from loaded profile
+          // Initialize edit form
           setEditData({
             name: loadedProfile.name || '',
             username: loadedProfile.username || '',
@@ -143,7 +192,7 @@ export default function ProfilePage() {
             website: loadedProfile.website || '',
           });
 
-          // 🔹 Fetch this user's posts (use targetUserId)
+          // Fetch posts authored by targetUserId
           let postsDocs = [];
           try {
             const postsRef = collection(db, 'posts');
@@ -155,23 +204,25 @@ export default function ProfilePage() {
             const postsSnap = await getDocs(q);
             postsDocs = postsSnap.docs;
           } catch (error) {
-            console.error('Error fetching posts (may need index):', error);
-            // Try without orderBy if index doesn't exist
+            console.error('Error fetching posts (index maybe missing):', error);
+            // try without orderBy
             try {
               const postsRef = collection(db, 'posts');
-              const q = query(
-                postsRef,
-                where('authorId', '==', targetUserId)
-              );
+              const q = query(postsRef, where('authorId', '==', targetUserId));
               const postsSnap = await getDocs(q);
               postsDocs = postsSnap.docs;
-              // Sort client-side
               postsDocs.sort((a, b) => {
                 const aData = a.data();
                 const bData = b.data();
-                const aTime = aData.createdAt?.toMillis?.() || aData.createdAt?.seconds || 0;
-                const bTime = bData.createdAt?.toMillis?.() || bData.createdAt?.seconds || 0;
-                return bTime - aTime; // Descending order
+                const aTime =
+                  aData.createdAt?.toMillis?.() ||
+                  aData.createdAt?.seconds ||
+                  0;
+                const bTime =
+                  bData.createdAt?.toMillis?.() ||
+                  bData.createdAt?.seconds ||
+                  0;
+                return bTime - aTime;
               });
             } catch (err) {
               console.error('Error fetching posts without orderBy:', err);
@@ -195,7 +246,7 @@ export default function ProfilePage() {
               );
             }
 
-            // Check if current user has liked this post
+            // Check like status for current user
             let isLiked = false;
             if (user.uid) {
               try {
@@ -240,33 +291,35 @@ export default function ProfilePage() {
             ]);
           }
 
-          // Fetch posts that this user has liked (for Likes tab)
-          // Only fetch if viewing own profile
+          // Likes tab — only for own profile
           if (isOwnProfile && user.uid) {
             try {
-              // Get all posts
               const allPostsRef = collection(db, 'posts');
               const allPostsSnap = await getDocs(allPostsRef);
-              
+
               const likedPostsList = [];
-              
-              // Check each post to see if user has liked it
+
               for (const postDoc of allPostsSnap.docs) {
                 try {
-                  const likeRef = doc(db, 'posts', postDoc.id, 'likes', user.uid);
+                  const likeRef = doc(
+                    db,
+                    'posts',
+                    postDoc.id,
+                    'likes',
+                    user.uid
+                  );
                   const likeSnap = await getDoc(likeRef);
-                  
+
                   if (likeSnap.exists()) {
-                    // User has liked this post, fetch full post data
                     const postData = postDoc.data();
-                    
+
                     let replyCount = 0;
                     try {
                       replyCount = await getReplyCount(postDoc.id);
                     } catch (err) {
                       console.error('Error getting reply count:', err);
                     }
-                    
+
                     likedPostsList.push({
                       id: postDoc.id,
                       content: postData.content || '',
@@ -282,33 +335,31 @@ export default function ProfilePage() {
                       authorId: postData.authorId,
                       authorName: postData.authorName || 'Member',
                       authorEmail: postData.authorEmail || '',
+                      authorAvatar: postData.authorAvatar || null,
                     });
                   }
                 } catch (err) {
                   console.error('Error checking like for post', postDoc.id, err);
                 }
               }
-              
-              // Sort by timestamp (most recent first)
+
               likedPostsList.sort((a, b) => {
                 const aTime = new Date(a.timestamp).getTime();
                 const bTime = new Date(b.timestamp).getTime();
                 return bTime - aTime;
               });
-              
+
               setLikedPosts(likedPostsList);
             } catch (err) {
               console.error('Error fetching liked posts:', err);
               setLikedPosts([]);
             }
           } else {
-            // For other users' profiles, show empty (or fetch their liked posts if you want)
             setLikedPosts([]);
           }
         } catch (err) {
           console.error('Error loading profile or posts:', err);
           setError('Failed to load profile. Please try again.');
-          setLoading(false);
         } finally {
           setLoading(false);
         }
@@ -327,30 +378,27 @@ export default function ProfilePage() {
     const post = postsArray.find((p) => p.id === postId);
     const wasLiked = post?.isLiked || false;
 
-    // Optimistic UI update
+    // Optimistic UI
     setPostsArray(
-      postsArray.map((post) =>
-        post.id === postId
+      postsArray.map((p) =>
+        p.id === postId
           ? {
-              ...post,
-              likes: post.isLiked ? Math.max(0, post.likes - 1) : post.likes + 1,
-              isLiked: !post.isLiked,
+              ...p,
+              likes: p.isLiked ? Math.max(0, p.likes - 1) : p.likes + 1,
+              isLiked: !p.isLiked,
             }
-          : post
+          : p
       )
     );
 
-    // Firestore toggle (one like per user)
     try {
       await toggleLike(postId, currentUserId);
-      
-      // Update likedPosts list if viewing own profile
+
+      // Keep likedPosts in sync for own profile
       if (isCurrentUserProfile) {
         if (wasLiked) {
-          // Remove from likedPosts
           setLikedPosts((prev) => prev.filter((p) => p.id !== postId));
         } else {
-          // Add to likedPosts - fetch the post data
           try {
             const postRef = doc(db, 'posts', postId);
             const postSnap = await getDoc(postRef);
@@ -362,7 +410,7 @@ export default function ProfilePage() {
               } catch (err) {
                 console.error('Error getting reply count:', err);
               }
-              
+
               const newLikedPost = {
                 id: postId,
                 content: postData.content || '',
@@ -378,8 +426,9 @@ export default function ProfilePage() {
                 authorId: postData.authorId,
                 authorName: postData.authorName || 'Member',
                 authorEmail: postData.authorEmail || '',
+                authorAvatar: postData.authorAvatar || null,
               };
-              
+
               setLikedPosts((prev) => [newLikedPost, ...prev]);
             }
           } catch (err) {
@@ -389,16 +438,16 @@ export default function ProfilePage() {
       }
     } catch (e) {
       console.error('Failed to toggle like', e);
-      // Revert UI on error
+      // Revert UI
       setPostsArray(
-        postsArray.map((post) =>
-          post.id === postId
+        postsArray.map((p) =>
+          p.id === postId
             ? {
-                ...post,
-                likes: post.isLiked ? post.likes + 1 : Math.max(0, post.likes - 1),
-                isLiked: !post.isLiked,
+                ...p,
+                likes: p.isLiked ? p.likes + 1 : Math.max(0, p.likes - 1),
+                isLiked: !p.isLiked,
               }
-            : post
+            : p
         )
       );
       alert('Failed to like post. Please try again.');
@@ -417,10 +466,13 @@ export default function ProfilePage() {
 
   const handleSendMessage = async () => {
     if (!currentUserId || !profileId) return;
-    
+
     setSendingMessage(true);
     try {
-      const conversationId = await findOrCreateConversation(currentUserId, profileId);
+      const conversationId = await findOrCreateConversation(
+        currentUserId,
+        profileId
+      );
       router.push(`/member/messages/${conversationId}`);
     } catch (err) {
       console.error('Error starting conversation:', err);
@@ -430,7 +482,7 @@ export default function ProfilePage() {
     }
   };
 
-  // Save profile changes (text fields + avatar + cover photo)
+  // Save profile changes (text + avatar + cover)
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     if (!profile) return;
@@ -438,7 +490,7 @@ export default function ProfilePage() {
     try {
       setSaving(true);
 
-      // Validate files before upload
+      // Validate locally first
       if (avatarFile) {
         const avatarError = validateFile(avatarFile, 'avatar');
         if (avatarError) {
@@ -460,87 +512,89 @@ export default function ProfilePage() {
       let avatarUrl = profile.avatar;
       let coverUrl = profile.coverImage;
 
-      // Upload avatar if provided
+      // Upload avatar
       if (avatarFile) {
         try {
-          console.log('Uploading avatar to Firebase Storage...');
           const avatarRef = ref(storage, `avatars/${profile.uid}`);
           await uploadBytes(avatarRef, avatarFile);
           avatarUrl = await getDownloadURL(avatarRef);
-          console.log('Avatar uploaded successfully:', avatarUrl);
         } catch (uploadError) {
           console.error('Avatar upload error:', uploadError);
-          
-          // Handle specific Firebase Storage errors
           if (uploadError.code === 'storage/unauthorized') {
-            throw new Error('Permission denied. Please check Firebase Storage security rules.');
+            throw new Error(
+              'Permission denied. Please check Firebase Storage security rules.'
+            );
           } else if (uploadError.code === 'storage/quota-exceeded') {
-            throw new Error('Storage quota exceeded. Please contact support.');
+            throw new Error(
+              'Storage quota exceeded. Please contact support.'
+            );
           } else if (uploadError.code === 'storage/unauthenticated') {
             throw new Error('You must be logged in to upload images.');
           } else {
-            throw new Error(`Failed to upload avatar: ${uploadError.message || 'Unknown error'}`);
+            throw new Error(
+              `Failed to upload avatar: ${
+                uploadError.message || 'Unknown error'
+              }`
+            );
           }
         }
       }
 
-      // Upload cover image if provided
+      // Upload cover
       if (coverFile) {
         try {
-          console.log('Uploading cover image to Firebase Storage...');
           const coverRef = ref(storage, `covers/${profile.uid}`);
           await uploadBytes(coverRef, coverFile);
           coverUrl = await getDownloadURL(coverRef);
-          console.log('Cover image uploaded successfully:', coverUrl);
         } catch (uploadError) {
           console.error('Cover image upload error:', uploadError);
-          
-          // Handle specific Firebase Storage errors
           if (uploadError.code === 'storage/unauthorized') {
-            throw new Error('Permission denied. Please check Firebase Storage security rules.');
+            throw new Error(
+              'Permission denied. Please check Firebase Storage security rules.'
+            );
           } else if (uploadError.code === 'storage/quota-exceeded') {
-            throw new Error('Storage quota exceeded. Please contact support.');
+            throw new Error(
+              'Storage quota exceeded. Please contact support.'
+            );
           } else if (uploadError.code === 'storage/unauthenticated') {
             throw new Error('You must be logged in to upload images.');
           } else {
-            throw new Error(`Failed to upload cover image: ${uploadError.message || 'Unknown error'}`);
+            throw new Error(
+              `Failed to upload cover image: ${
+                uploadError.message || 'Unknown error'
+              }`
+            );
           }
         }
       }
 
       // Save to Firestore
-      try {
-        console.log('Saving profile data to Firestore...');
-        const refDoc = doc(db, 'members', profile.uid);
-
-        await setDoc(
-          refDoc,
-          {
-            name: editData.name.trim() || profile.name,
-            username:
-              editData.username.trim() ||
-              profile.username ||
-              profile.email.split('@')[0],
-            bio: editData.bio.trim(),
-            location: editData.location.trim(),
-            website: editData.website.trim(),
-            avatar: avatarUrl,
-            coverImage: coverUrl,
-          },
-          { merge: true }
-        );
-        console.log('Profile saved successfully to Firestore');
-      } catch (firestoreError) {
-        console.error('Firestore save error:', firestoreError);
-        throw new Error(`Failed to save profile: ${firestoreError.message || 'Unknown error'}`);
-      }
+      const refDoc = doc(db, 'members', profile.uid);
+      await setDoc(
+        refDoc,
+        {
+          name: editData.name.trim() || profile.name,
+          username:
+            editData.username.trim() ||
+            profile.username ||
+            profile.email.split('@')[0],
+          bio: editData.bio.trim(),
+          location: editData.location.trim(),
+          website: editData.website.trim(),
+          avatar: avatarUrl,
+          coverImage: coverUrl,
+        },
+        { merge: true }
+      );
 
       // Update local state
       setProfile((prev) => ({
         ...prev,
         name: editData.name.trim() || prev.name,
         username:
-          editData.username.trim() || prev.username || prev.email.split('@')[0],
+          editData.username.trim() ||
+          prev.username ||
+          prev.email.split('@')[0],
         bio: editData.bio.trim(),
         location: editData.location.trim(),
         website: editData.website.trim(),
@@ -551,12 +605,11 @@ export default function ProfilePage() {
       setIsEditing(false);
       setAvatarFile(null);
       setCoverFile(null);
-      
-      // Show success message
       alert('Profile updated successfully!');
     } catch (err) {
       console.error('Error saving profile:', err);
-      const errorMessage = err.message || 'Failed to save profile. Please try again.';
+      const errorMessage =
+        err.message || 'Failed to save profile. Please try again.';
       alert(errorMessage);
     } finally {
       setSaving(false);
@@ -564,112 +617,117 @@ export default function ProfilePage() {
   };
 
   const PostCard = ({ post, postsArray, setPostsArray }) => {
-    // For liked posts, show the post author's info; for own posts, show profile owner's info
     const displayName = post.authorName || profile.name;
-    const displayUsername = post.authorEmail?.split('@')[0] || profile.username;
+    const displayUsername =
+      post.authorEmail?.split?.('@')[0] || profile.username;
     const displayAvatar = post.authorAvatar || profile.avatar;
-    
+
     return (
-    <Card className="p-6 bg-card/50 backdrop-blur-xl border-border/50 hover:border-primary/30 transition-all duration-300">
-      <div className="flex items-start gap-4 mb-4">
-        <Avatar className="h-12 w-12 ring-2 ring-primary/20">
-          <AvatarImage src={displayAvatar || '/placeholder.svg'} />
-          <AvatarFallback>
-            {displayName ? displayName.slice(0, 2).toUpperCase() : 'HQ'}
-          </AvatarFallback>
-        </Avatar>
-        <div className="flex-1">
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-2 ">
-              {post.authorId ? (
-                <Link
-                  href={`/member/profile/${post.authorId}`}
-                  className="font-semibold text-foreground hover:text-primary transition-colors"
-                >
-                  {displayName}
-                </Link>
-              ) : (
-                <h3 className="font-semibold text-foreground">{displayName}</h3>
-              )}
-              <span className="text-xs text-muted-foreground">
-                @{displayUsername}
-              </span>
+      <Card className="p-6 bg-card/50 backdrop-blur-xl border-border/50 hover:border-primary/30 transition-all duration-300">
+        <div className="flex items-start gap-4 mb-4">
+          <Avatar className="h-12 w-12 ring-2 ring-primary/20">
+            <AvatarImage src={displayAvatar || '/placeholder.svg'} />
+            <AvatarFallback>
+              {displayName ? displayName.slice(0, 2).toUpperCase() : 'HQ'}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2 ">
+                {post.authorId ? (
+                  <Link
+                    href={`/member/profile/${post.authorId}`}
+                    className="font-semibold text-foreground hover:text-primary transition-colors"
+                  >
+                    {displayName}
+                  </Link>
+                ) : (
+                  <h3 className="font-semibold text-foreground">
+                    {displayName}
+                  </h3>
+                )}
+                <span className="text-xs text-muted-foreground">
+                  @{displayUsername}
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-primary h-8 w-8"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="text-muted-foreground hover:text-primary h-8 w-8"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
+            <p className="text-sm text-muted-foreground">{post.timestamp}</p>
           </div>
-          <p className="text-sm text-muted-foreground">{post.timestamp}</p>
         </div>
-      </div>
 
-      <p className="text-foreground mb-4 leading-relaxed">{post.content}</p>
+        <p className="text-foreground mb-4 leading-relaxed">
+          {post.content}
+        </p>
 
-      {post.image && (
-        <div className="mb-4 rounded-lg overflow-hidden border border-border/50">
-          <Image
-            src={post.image || '/placeholder.svg'}
-            alt="Post content"
-            className="w-full h-auto"
-            width={600}
-            height={400}
-          />
+        {post.image && (
+          <div className="mb-4 rounded-lg overflow-hidden border border-border/50">
+            <Image
+              src={post.image || '/placeholder.svg'}
+              alt="Post content"
+              className="w-full h-auto"
+              width={600}
+              height={400}
+            />
+          </div>
+        )}
+
+        <div className="flex items-center justify-between pt-4 border-t border-border/50">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleLike(post.id, postsArray, setPostsArray)}
+            className={`gap-2 ${
+              post.isLiked
+                ? 'text-red-500 hover:text-red-600'
+                : 'text-muted-foreground hover:text-red-500'
+            }`}
+          >
+            <Heart
+              className={`h-5 w-5 ${post.isLiked ? 'fill-current' : ''}`}
+            />
+            <span className="text-sm">{post.likes}</span>
+          </Button>
+
+          <Link
+            href={`/member/post/${post.id}`}
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary text-sm"
+          >
+            <MessageCircle className="h-5 w-5" />
+            <span className="text-sm">{post.comments}</span>
+          </Link>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-2 text-muted-foreground hover:text-primary"
+          >
+            <Share2 className="h-5 w-5" />
+            <span className="text-sm">{post.shares}</span>
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleBookmark(post.id, postsArray, setPostsArray)}
+            className={`${
+              post.isBookmarked
+                ? 'text-accent hover:text-accent/80'
+                : 'text-muted-foreground hover:text-accent'
+            }`}
+          >
+            <Bookmark
+              className={`h-5 w-5 ${post.isBookmarked ? 'fill-current' : ''}`}
+            />
+          </Button>
         </div>
-      )}
-
-      <div className="flex items-center justify-between pt-4 border-t border-border/50">
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => handleLike(post.id, postsArray, setPostsArray)}
-          className={`gap-2 ${
-            post.isLiked
-              ? 'text-red-500 hover:text-red-600'
-              : 'text-muted-foreground hover:text-red-500'
-          }`}
-        >
-          <Heart className={`h-5 w-5 ${post.isLiked ? 'fill-current' : ''}`} />
-          <span className="text-sm">{post.likes}</span>
-        </Button>
-
-        {/* 🔹 Open comments thread for this post */}
-        <Link
-          href={`/member/post/${post.id}`}
-          className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary text-sm"
-        >
-          <MessageCircle className="h-5 w-5" />
-          <span className="text-sm">{post.comments}</span>
-        </Link>
-
-        <Button
-          variant="ghost"
-          size="sm"
-          className="gap-2 text-muted-foreground hover:text-primary"
-        >
-          <Share2 className="h-5 w-5" />
-          <span className="text-sm">{post.shares}</span>
-        </Button>
-
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => handleBookmark(post.id, postsArray, setPostsArray)}
-          className={`${
-            post.isBookmarked
-              ? 'text-accent hover:text-accent/80'
-              : 'text-muted-foreground hover:text-accent'
-          }`}
-        >
-          <Bookmark
-            className={`h-5 w-5 ${post.isBookmarked ? 'fill-current' : ''}`}
-          />
-        </Button>
-      </div>
-    </Card>
+      </Card>
     );
   };
 
@@ -698,8 +756,8 @@ export default function ProfilePage() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Cover Image */}
-      <div className="relative h-48 md:h-64 bg-gradient-to-r from-primary/20 via-accent/20 to-secondary/20">
+      {/* Cover */}
+      <div className="relative h-48 md:h-64 bg-linear-to-r from-primary/20 via-accent/20 to-secondary/20">
         {profile.coverImage && (
           <Image
             src={profile.coverImage}
@@ -724,62 +782,64 @@ export default function ProfilePage() {
         )}
       </div>
 
-      {/* Add top padding so content starts below avatar */}
-      <div className="relative px-6 pb-6 pt-20 md:pt-24">
-            {/* Avatar */}
-            <div className="absolute -top-16 md:-top-20">
-              <Avatar className="h-32 w-32 md:h-40 md:w-40 ring-4 ring-card border-4 border-background">
-                <AvatarImage src={profile.avatar || '/placeholder.svg'} />
-                <AvatarFallback className="text-3xl">
-                  {profile.name ? profile.name.slice(0, 2) : 'HQ'}
-                </AvatarFallback>
-              </Avatar>
-            </div>
+      {/* Main profile & tabs */}
+      <div className="max-w-4xl mx-auto px-4 pb-12">
+        {/* Header block */}
+        <div className="relative px-0 pb-6 pt-20 md:pt-24">
+          {/* Avatar */}
+          <div className="absolute -top-16 md:-top-20">
+            <Avatar className="h-32 w-32 md:h-40 md:w-40 ring-4 ring-card border-4 border-background">
+              <AvatarImage src={profile.avatar || '/placeholder.svg'} />
+              <AvatarFallback className="text-3xl">
+                {profile.name ? profile.name.slice(0, 2) : 'HQ'}
+              </AvatarFallback>
+            </Avatar>
+          </div>
 
-            {/* Edit Profile toggle or Send Message button */}
-            <div className="flex justify-end">
-              {isCurrentUserProfile ? (
-                <Button
-                  onClick={() => setIsEditing((prev) => !prev)}
-                  className="
-                    bg-linear-to-r from-primary via-accent to-secondary
-                    text-white font-medium
-                    hover:opacity-90
-                    transition-all
-                  "
-                >
-                  {isEditing ? 'Cancel' : 'Edit Profile'}
-                </Button>
-              ) : (
-                <Button
-                  onClick={handleSendMessage}
-                  disabled={sendingMessage}
-                  className="
-                    bg-primary
-                    text-primary-foreground font-medium
-                    hover:bg-primary/90
-                    transition-all
-                  "
-                >
-                  {sendingMessage ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      Starting...
-                    </>
-                  ) : (
-                    <>
-                      <Send className="h-4 w-4 mr-2" />
-                      Send Message
-                    </>
-                  )}
-                </Button>
-              )}
-            </div>
+          {/* Edit / Message button */}
+          <div className="flex justify-end">
+            {isCurrentUserProfile ? (
+              <Button
+                onClick={() => setIsEditing((prev) => !prev)}
+                className="
+                  bg-linear-to-r from-primary via-accent to-secondary
+                  text-white font-medium
+                  hover:opacity-90
+                  transition-all
+                "
+              >
+                {isEditing ? 'Cancel' : 'Edit Profile'}
+              </Button>
+            ) : (
+              <Button
+                onClick={handleSendMessage}
+                disabled={sendingMessage}
+                className="
+                  bg-primary
+                  text-primary-foreground font-medium
+                  hover:bg-primary/90
+                  transition-all
+                "
+              >
+                {sendingMessage ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Starting...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Send Message
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
 
-            {/* Profile Info / Edit Form */}
-            <Card className="p-6 bg-card/50 backdrop-blur-xl border-border/50">
+          {/* Profile info card */}
+          <Card className="mt-4 p-6 bg-card/50 backdrop-blur-xl border-border/50">
             {!isEditing ? (
-              <div className="mt-4">
+              <div>
                 <h1 className="text-3xl font-bold text-foreground mb-1">
                   {profile.name}
                 </h1>
@@ -791,7 +851,6 @@ export default function ProfilePage() {
                   {profile.bio}
                 </p>
 
-                {/* Meta */}
                 <div className="flex flex-wrap gap-4 text-sm text-muted-foreground mb-2">
                   {profile.location && (
                     <div className="flex items-center gap-1">
@@ -818,13 +877,20 @@ export default function ProfilePage() {
 
                   <div className="flex items-center gap-1">
                     <Calendar className="h-4 w-4" />
-                    <span>Joined {profile.joined instanceof Date ? profile.joined.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : profile.joined}</span>
+                    <span>
+                      Joined{' '}
+                      {profile.joined instanceof Date
+                        ? profile.joined.toLocaleDateString('en-US', {
+                            month: 'short',
+                            year: 'numeric',
+                          })
+                        : profile.joined}
+                    </span>
                   </div>
                 </div>
               </div>
             ) : (
-              <form onSubmit={handleSaveProfile} className="mt-4 space-y-4">
-                {/* Small note about selected cover */}
+              <form onSubmit={handleSaveProfile} className="space-y-4">
                 {coverFile && (
                   <p className="text-xs text-muted-foreground mb-2">
                     Selected cover: {coverFile.name}
@@ -959,7 +1025,6 @@ export default function ProfilePage() {
                       setIsEditing(false);
                       setAvatarFile(null);
                       setCoverFile(null);
-                      // reset form to current profile values
                       setEditData({
                         name: profile.name || '',
                         username: profile.username || '',
@@ -986,11 +1051,11 @@ export default function ProfilePage() {
                 </div>
               </form>
             )}
-            </Card>
-          </div>
+          </Card>
+        </div>
 
-      {/* Tabs */}
-        <Tabs defaultValue="posts" className="space-y-6">
+        {/* Tabs */}
+        <Tabs defaultValue="posts" className="space-y-6 mt-4">
           <TabsList className="w-full bg-card/50 backdrop-blur-xl border border-border/50 p-1">
             <TabsTrigger
               value="posts"
@@ -1109,6 +1174,7 @@ export default function ProfilePage() {
             )}
           </TabsContent>
         </Tabs>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, use } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   Calendar,
@@ -17,6 +17,7 @@ import {
 import Link from 'next/link';
 import { db } from '@/app/lib/firebase/firebase';
 import { doc, getDoc, Timestamp } from 'firebase/firestore';
+import Image from 'next/image';
 
 // If you’re using output: 'export' you can keep this:
 export const dynamicParams = true;
@@ -31,7 +32,8 @@ function parseEventDate(dateField) {
 }
 
 export default function EventDetailPage(props) {
-  const { id } = props.params; // 'id' from /member/events/[id]
+  const params = use(props.params);
+  const { id } = params; // 'id' from /member/events/[id]
   const [event, setEvent] = useState(null);
   const [isRegistered, setIsRegistered] = useState(false);
   const [showRSVP, setShowRSVP] = useState(false);
@@ -259,11 +261,18 @@ export default function EventDetailPage(props) {
                       key={index}
                       className="flex items-center gap-3 p-3 rounded-xl bg-background/50 border border-border hover:border-primary/50 transition-colors"
                     >
-                      <img
+                      <Image
                         src={attendee.avatar || '/placeholder.svg'}
-                        alt={attendee.name}
+                        alt={attendee.name || 'Attendee'}
+                        width={48}
+                        height={48}
                         className="w-12 h-12 rounded-full object-cover"
+                        unoptimized={attendee.avatar?.startsWith('http')}
+                        onError={(e) => {
+                          e.target.src = '/placeholder.svg';
+                        }}
                       />
+
                       <div className="overflow-hidden">
                         <p className="font-medium text-sm text-foreground truncate">
                           {attendee.name}
@@ -297,7 +306,7 @@ export default function EventDetailPage(props) {
 
                   <div className="w-full bg-border rounded-full h-2 overflow-hidden">
                     <div
-                      className="bg-gradient-to-r from-primary to-accent h-full transition-all duration-500"
+                      className="bg-linear-to-r from-primary to-accent h-full transition-all duration-500"
                       style={{
                         width:
                           event.spots > 0
@@ -360,11 +369,18 @@ export default function EventDetailPage(props) {
                   Organized By
                 </h3>
                 <div className="flex items-center gap-4 mb-4">
-                  <img
-                    src={event.organizer.avatar || '/placeholder.svg'}
-                    alt={event.organizer.name}
-                    className="w-16 h-16 rounded-full object-cover border-2 border-primary"
+                  <Image
+                    src={attendee.avatar || '/placeholder.svg'}
+                    alt={attendee.name || 'Attendee'}
+                    width={48}
+                    height={48}
+                    className="w-12 h-12 rounded-full object-cover"
+                    unoptimized={attendee.avatar?.startsWith('http')}
+                    onError={(e) => {
+                      e.target.src = '/placeholder.svg';
+                    }}
                   />
+
                   <div>
                     <p className="font-semibold text-foreground">
                       {event.organizer.name}
