@@ -74,6 +74,8 @@ export default function RegisterEventPage(props) {
     role: '',
     experienceLevel: '',
     github: '',
+    // 🆕 Hackathon team emails (supports up to 6)
+    hackathonEmails: ['', '', '', '', '', ''],
 
     // Workshop
     focusArea: '',
@@ -84,6 +86,15 @@ export default function RegisterEventPage(props) {
     emergencyPhone: '',
     tripNotes: '',
   });
+
+  // 🆕 How many hackathon email slots are currently visible (3–6)
+  const [hackathonEmailCount, setHackathonEmailCount] = useState(3);
+
+  const isHackathon = (event?.category || '').toLowerCase() === 'hackathon';
+  const isWorkshop = (event?.category || '').toLowerCase() === 'workshop';
+  const isFieldTrip =
+    (event?.category || '').toLowerCase() === 'field trip' ||
+    (event?.category || '').toLowerCase() === 'field-trip';
 
   // 🔐 Watch auth state & require login
   useEffect(() => {
@@ -168,6 +179,15 @@ export default function RegisterEventPage(props) {
     }
   };
 
+  // 🆕 Dedicated handler for hackathon email slots
+  const handleHackathonEmailChange = (index, value) => {
+    setFormData((prev) => {
+      const next = [...(prev.hackathonEmails || ['', '', '', '', '', ''])];
+      next[index] = value;
+      return { ...prev, hackathonEmails: next };
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -177,6 +197,21 @@ export default function RegisterEventPage(props) {
         alert('Please log in to register for this event.');
         router.push(`/login?next=/member/events/${id}/register`);
         return;
+      }
+
+      // 🆕 Hackathon validation: require at least 3 emails
+      if (isHackathon) {
+        const requiredEmails = (formData.hackathonEmails || []).slice(0, 3);
+        const missingRequired = requiredEmails.some(
+          (email) => !email || !email.trim()
+        );
+        if (missingRequired) {
+          alert(
+            'Please enter at least 3 team member email addresses for the hackathon.'
+          );
+          setIsSubmitting(false);
+          return;
+        }
       }
 
       const userId = currentUser.uid;
@@ -196,12 +231,19 @@ export default function RegisterEventPage(props) {
         return;
       }
 
+      // 🆕 Clean hackathon emails (trim + remove empties) if hackathon
+      const cleanedHackathonEmails =
+        isHackathon && Array.isArray(formData.hackathonEmails)
+          ? formData.hackathonEmails.map((e) => e.trim()).filter(Boolean)
+          : undefined;
+
       // 📝 Save registration
       await setDoc(registrationRef, {
         userId,
         eventId: id,
         category: event.category,
         ...formData,
+        ...(isHackathon && { hackathonEmails: cleanedHackathonEmails }),
         createdAt: serverTimestamp(),
       });
 
@@ -252,9 +294,6 @@ export default function RegisterEventPage(props) {
   }
 
   const category = (event.category || '').toLowerCase();
-  const isHackathon = category === 'hackathon';
-  const isWorkshop = category === 'workshop';
-  const isFieldTrip = category === 'field trip' || category === 'field-trip';
 
   return (
     <div className="min-h-screen bg-background">
@@ -588,6 +627,66 @@ export default function RegisterEventPage(props) {
                           placeholder="https://github.com/username"
                         />
                       </div>
+                    </div>
+
+                    {/* 🆕 Team member email slots */}
+                    <div className="mt-8">
+                      <h4 className="text-md font-semibold mb-2 text-foreground">
+                        Team Member Emails (3–6 people)
+                      </h4>
+                      <p className="text-xs text-muted-foreground mb-4">
+                        Add the Hofstra email addresses for your teammates.
+                        Enter at least <span className="font-semibold">3</span>{' '}
+                        emails (you can add up to 6).
+                      </p>
+
+                      <div className="space-y-3">
+                        {Array.from({ length: hackathonEmailCount }).map(
+                          (_, index) => (
+                            <div key={index}>
+                              <label
+                                htmlFor={`hackathonEmail_${index}`}
+                                className="block text-sm font-medium text-foreground mb-1"
+                              >
+                                Team Member Email {index + 1}{' '}
+                                {index < 3 && (
+                                  <span className="text-destructive">*</span>
+                                )}
+                              </label>
+                              <input
+                                type="email"
+                                id={`hackathonEmail_${index}`}
+                                value={
+                                  formData.hackathonEmails?.[index] || ''
+                                }
+                                onChange={(e) =>
+                                  handleHackathonEmailChange(
+                                    index,
+                                    e.target.value
+                                  )
+                                }
+                                required={index < 3} // first 3 required
+                                className="w-full px-4 py-3 bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary text-foreground"
+                                placeholder="teammate@pride.hofstra.edu"
+                              />
+                            </div>
+                          )
+                        )}
+                      </div>
+
+                      {hackathonEmailCount < 6 && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setHackathonEmailCount((prev) =>
+                              Math.min(6, prev + 1)
+                            )
+                          }
+                          className="mt-3 text-sm text-primary hover:underline"
+                        >
+                          + Add another teammate
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}

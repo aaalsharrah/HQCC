@@ -38,6 +38,7 @@ import {
   where,
   orderBy,
   updateDoc,
+  deleteDoc,
 } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { createNotification } from '@/app/lib/firebase/notifications';
@@ -571,6 +572,24 @@ export default function AdminDashboard() {
       requirementsText: '',
       whosComingText: '',
     });
+  };
+  const handleDeleteEvent = async (eventId, title) => {
+    const confirmed = window.confirm(
+      `Are you sure you want to delete the event "${title}"?\nThis action cannot be undone.`
+    );
+
+    if (!confirmed) return;
+
+    try {
+      // 🔥 Delete from Firestore
+      await deleteDoc(doc(db, 'events', eventId));
+
+      // 🔄 Remove from local state so UI updates
+      setEvents((prev) => prev.filter((e) => e.id !== eventId));
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      alert('Failed to delete event. Please try again.');
+    }
   };
 
   const handleCreateEvent = async () => {
@@ -1610,9 +1629,7 @@ export default function AdminDashboard() {
                               variant="outline"
                               className="gap-2 hover:text-destructive hover:border-destructive bg-transparent"
                               onClick={() =>
-                                setEvents((prev) =>
-                                  prev.filter((e) => e.id !== event.id)
-                                )
+                                handleDeleteEvent(event.id, event.title)
                               }
                             >
                               <Trash2 className="h-4 w-4" />
