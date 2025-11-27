@@ -656,9 +656,7 @@ export default function RegisterEventPage(props) {
                               <input
                                 type="email"
                                 id={`hackathonEmail_${index}`}
-                                value={
-                                  formData.hackathonEmails?.[index] || ''
-                                }
+                                value={formData.hackathonEmails?.[index] || ''}
                                 onChange={(e) =>
                                   handleHackathonEmailChange(
                                     index,

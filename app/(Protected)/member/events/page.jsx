@@ -1,16 +1,19 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { Calendar, Clock, MapPin, Users, ArrowRight, Loader2 } from 'lucide-react';
+import {
+  Calendar,
+  Clock,
+  MapPin,
+  Users,
+  ArrowRight,
+  Loader2,
+} from 'lucide-react';
 import Image from 'next/image';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { db } from '@/app/lib/firebase/firebase';
-import {
-  collection,
-  getDocs,
-  Timestamp,
-} from 'firebase/firestore';
+import { collection, getDocs, Timestamp } from 'firebase/firestore';
 
 // Helper function to parse event date
 function parseEventDate(dateField) {
@@ -75,10 +78,10 @@ export default function EventsPage() {
         const processedEvents = eventsData.map((event) => {
           // Parse the date field (could be Timestamp, Date, or string)
           const eventDate = parseEventDate(event.date);
-          
+
           // Calculate attendees from registrations
           const attendees = registrationsData.filter(
-            (r) => r.eventId === event.id || r.event === event.id,
+            (r) => r.eventId === event.id || r.event === event.id
           ).length;
 
           // Format date for display using helper function
@@ -118,13 +121,20 @@ export default function EventsPage() {
           .filter((event) => {
             if (!event.originalDate) {
               // Include events without dates in upcoming (they might be drafts)
-              console.log('Event without date included in upcoming:', event.title);
+              console.log(
+                'Event without date included in upcoming:',
+                event.title
+              );
               return true;
             }
             try {
               // Compare the actual event datetime with current datetime
               const isUpcoming = event.originalDate >= now;
-              console.log(`Event "${event.title}": date=${event.originalDate.toISOString()}, now=${now.toISOString()}, isUpcoming=${isUpcoming}`);
+              console.log(
+                `Event "${
+                  event.title
+                }": date=${event.originalDate.toISOString()}, now=${now.toISOString()}, isUpcoming=${isUpcoming}`
+              );
               return isUpcoming;
             } catch (e) {
               console.error('Error comparing date for event:', event.title, e);
@@ -160,7 +170,10 @@ export default function EventsPage() {
 
         console.log('Upcoming events:', upcoming.length);
         console.log('Past events:', past.length);
-        console.log('Upcoming events list:', upcoming.map(e => ({ title: e.title, date: e.date })));
+        console.log(
+          'Upcoming events list:',
+          upcoming.map((e) => ({ title: e.title, date: e.date }))
+        );
 
         // Note: Event notifications are created when admins create events via the admin dashboard
         // This ensures proper permissions and avoids permission errors on the public events page
@@ -254,96 +267,96 @@ export default function EventsPage() {
             ) : (
               <div className="grid md:grid-cols-2 gap-8">
                 {events.map((event, index) => (
-                <div
-                  key={event.id}
-                  className="group relative bg-card/50 backdrop-blur-sm border border-border rounded-2xl overflow-hidden hover:border-primary/50 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/20"
-                  style={{
-                    animation: `fadeInUp 0.6s ease-out ${index * 0.1}s both`,
-                  }}
-                >
-                  {/* Event Image */}
-                  <div className="relative h-48 overflow-hidden">
-                    <Image
-                      src={event.image || '/placeholder.svg'}
-                      alt={event.title}
-                      width={192}
-                      height={192}
-                      className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                    />
-                    <div className="absolute inset-0 bg-linear-to-t from-card to-transparent" />
-                    <div className="absolute top-4 right-4">
-                      <span className="px-3 py-1 bg-primary/90 backdrop-blur-sm text-primary-foreground text-sm font-medium rounded-full">
-                        {event.category}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Event Content */}
-                  <div className="p-6 space-y-4">
-                    <h3 className="text-2xl font-bold text-foreground group-hover:text-primary transition-colors">
-                      {event.title}
-                    </h3>
-                    <p className="text-muted-foreground leading-relaxed">
-                      {event.description}
-                    </p>
-
-                    {/* Event Details */}
-                    <div className="space-y-2 pt-2">
-                      <div className="flex items-center gap-2 text-sm text-foreground/70">
-                        <Calendar className="w-4 h-4 text-primary" />
-                        <span>
-                          {new Date(event.date).toLocaleDateString('en-US', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                          })}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-foreground/70">
-                        <Clock className="w-4 h-4 text-accent" />
-                        <span>{event.time}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-foreground/70">
-                        <MapPin className="w-4 h-4 text-secondary" />
-                        <span>{event.location}</span>
-                      </div>
-                      <div className="flex items-center gap-2 text-sm text-foreground/70">
-                        <Users className="w-4 h-4 text-primary" />
-                        <span>
-                          {event.attendees}{' '}
-                          {activeTab === 'upcoming'
-                            ? `/ ${event.spots} spots`
-                            : 'attended'}
+                  <div
+                    key={event.id}
+                    className="group relative bg-card/50 backdrop-blur-sm border border-border rounded-2xl overflow-hidden hover:border-primary/50 transition-all duration-500 hover:shadow-2xl hover:shadow-primary/20"
+                    style={{
+                      animation: `fadeInUp 0.6s ease-out ${index * 0.1}s both`,
+                    }}
+                  >
+                    {/* Event Image */}
+                    <div className="relative h-48 overflow-hidden">
+                      <Image
+                        src={event.image || '/placeholder.svg'}
+                        alt={event.title}
+                        width={192}
+                        height={192}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                      />
+                      <div className="absolute inset-0 bg-linear-to-t from-card to-transparent" />
+                      <div className="absolute top-4 right-4">
+                        <span className="px-3 py-1 bg-primary/90 backdrop-blur-sm text-primary-foreground text-sm font-medium rounded-full">
+                          {event.category}
                         </span>
                       </div>
                     </div>
 
-                    {/* Action Button */}
-                    <div className="pt-4">
-                      {activeTab === 'upcoming' ? (
-                        <Link href={`/member/events/${event.id}`}>
-                          <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground group/btn">
-                            Register Now
-                            <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover/btn:translate-x-1" />
+                    {/* Event Content */}
+                    <div className="p-6 space-y-4">
+                      <h3 className="text-2xl font-bold text-foreground group-hover:text-primary transition-colors">
+                        {event.title}
+                      </h3>
+                      <p className="text-muted-foreground leading-relaxed">
+                        {event.description}
+                      </p>
+
+                      {/* Event Details */}
+                      <div className="space-y-2 pt-2">
+                        <div className="flex items-center gap-2 text-sm text-foreground/70">
+                          <Calendar className="w-4 h-4 text-primary" />
+                          <span>
+                            {new Date(event.date).toLocaleDateString('en-US', {
+                              weekday: 'long',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                            })}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-foreground/70">
+                          <Clock className="w-4 h-4 text-accent" />
+                          <span>{event.time}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-foreground/70">
+                          <MapPin className="w-4 h-4 text-secondary" />
+                          <span>{event.location}</span>
+                        </div>
+                        <div className="flex items-center gap-2 text-sm text-foreground/70">
+                          <Users className="w-4 h-4 text-primary" />
+                          <span>
+                            {event.attendees}{' '}
+                            {activeTab === 'upcoming'
+                              ? `/ ${event.spots} spots`
+                              : 'attended'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Action Button */}
+                      <div className="pt-4">
+                        {activeTab === 'upcoming' ? (
+                          <Link href={`/member/events/${event.id}`}>
+                            <Button className="w-full bg-primary hover:bg-primary/90 text-primary-foreground group/btn">
+                              Register Now
+                              <ArrowRight className="w-4 h-4 ml-2 transition-transform group-hover/btn:translate-x-1" />
+                            </Button>
+                          </Link>
+                        ) : event.recording ? (
+                          <Button
+                            variant="outline"
+                            className="w-full border-border hover:bg-card/50 bg-transparent"
+                          >
+                            View Recording
+                            <ArrowRight className="w-4 h-4 ml-2" />
                           </Button>
-                        </Link>
-                      ) : event.recording ? (
-                        <Button
-                          variant="outline"
-                          className="w-full border-border hover:bg-card/50 bg-transparent"
-                        >
-                          View Recording
-                          <ArrowRight className="w-4 h-4 ml-2" />
-                        </Button>
-                      ) : (
-                        <Button variant="ghost" className="w-full" disabled>
-                          No Recording Available
-                        </Button>
-                      )}
+                        ) : (
+                          <Button variant="ghost" className="w-full" disabled>
+                            No Recording Available
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
                 ))}
               </div>
             )}
