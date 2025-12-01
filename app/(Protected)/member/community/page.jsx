@@ -6,12 +6,12 @@ import {
   Code,
   Sparkles,
   TrendingUp,
-  Mail,
-  Linkedin,
   Github,
   Loader2,
   GraduationCap,
+  Globe,
 } from 'lucide-react';
+
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -93,6 +93,7 @@ export default function CommunityPage() {
             avatar: data.avatar || null,
             linkedin: data.linkedin || '#',
             github: data.github || '#',
+            website: data.website || '', // ✅ NEW
             joinedAt: data.joinedAt || data.createdAt || null,
           };
         });
@@ -378,40 +379,12 @@ export default function CommunityPage() {
                   )}
 
                   {/* Social Links */}
+                  {/* Social Links */}
                   <div className="mt-auto">
                     <div
                       className="flex gap-2 justify-center pt-4 border-t border-border/50"
                       onClick={(e) => e.stopPropagation()}
                     >
-                      {member.email && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 hover:text-primary"
-                          asChild
-                        >
-                          <a href={`mailto:${member.email}`} aria-label="Email">
-                            <Mail className="h-4 w-4" />
-                          </a>
-                        </Button>
-                      )}
-                      {member.linkedin && member.linkedin !== '#' && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 hover:text-primary"
-                          asChild
-                        >
-                          <a
-                            href={member.linkedin}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label="LinkedIn"
-                          >
-                            <Linkedin className="h-4 w-4" />
-                          </a>
-                        </Button>
-                      )}
                       {member.github && member.github !== '#' && (
                         <Button
                           size="icon"
@@ -426,6 +399,24 @@ export default function CommunityPage() {
                             aria-label="GitHub"
                           >
                             <Github className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      )}
+
+                      {member.website && (
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-8 w-8 hover:text-primary"
+                          asChild
+                        >
+                          <a
+                            href={member.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            aria-label="Personal website"
+                          >
+                            <Globe className="h-4 w-4" />
                           </a>
                         </Button>
                       )}
