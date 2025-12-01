@@ -14,11 +14,33 @@ import {
   CheckCircle,
 } from 'lucide-react';
 import Link from 'next/link';
-import { db } from '@/app/lib/firebase/firebase';
-import { doc, getDoc, Timestamp } from 'firebase/firestore';
+import { useRouter } from 'next/navigation';
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from '@/components/ui/alert-dialog';
+
+import { db, auth } from '@/app/lib/firebase/firebase';
+import {
+  doc,
+  getDoc,
+  Timestamp,
+  collection,
+  getDocs,
+  query,
+  where,
+  deleteDoc,
+} from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
 import Image from 'next/image';
 
-// If you’re using output: 'export' you can keep this:
 export const dynamicParams = true;
 
 // Helper to parse Firestore / string dates
@@ -33,11 +55,32 @@ function parseEventDate(dateField) {
 export default function EventDetailPage(props) {
   const params = use(props.params);
   const { id } = params; // 'id' from /member/events/[id]
+  const router = useRouter();
+
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // 🔐 auth + RSVP state
+  const [currentUser, setCurrentUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [isRegistered, setIsRegistered] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+
+  // 🔢 attendee count from DB
+  const [attendeeCount, setAttendeeCount] = useState(0);
+
+  // Watch auth
   useEffect(() => {
-    if (!id) return; // ✅ don't run until we actually have an id
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user || null);
+      setAuthLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  // Fetch event document
+  useEffect(() => {
+    if (!id) return;
 
     async function fetchEvent() {
       try {
@@ -51,16 +94,15 @@ export default function EventDetailPage(props) {
         }
 
         const data = snap.data();
-
         const eventDate = parseEventDate(data.date);
 
-        // Fallbacks so UI doesn’t break if fields are missing
         const safeEvent = {
           id,
           title: data.title || 'Untitled Event',
           date: eventDate,
           time: data.time || '',
           location: data.location || '',
+          // fallback only – real count comes from registrations subcollection
           attendees: data.attendees || 0,
           category: data.category || 'Event',
           description: data.description || '',
@@ -88,6 +130,80 @@ export default function EventDetailPage(props) {
     fetchEvent();
   }, [id]);
 
+  // Fetch attendee count from subcollection events/{id}/registrations
+  useEffect(() => {
+    if (!id) return;
+
+    async function fetchAttendeeCount() {
+      try {
+        const regsRef = collection(db, 'events', id, 'registrations');
+        const regsSnap = await getDocs(regsRef);
+        setAttendeeCount(regsSnap.size);
+      } catch (err) {
+        console.error('Error fetching attendee count:', err);
+        setAttendeeCount(0);
+      }
+    }
+
+    fetchAttendeeCount();
+  }, [id]);
+
+  // Check if current user is registered for this event
+  useEffect(() => {
+    if (!id || !currentUser) {
+      setIsRegistered(false);
+      return;
+    }
+
+    async function checkRegistration() {
+      try {
+        const regsRef = collection(db, 'events', id, 'registrations');
+        const qSnap = await getDocs(
+          query(regsRef, where('userId', '==', currentUser.uid))
+        );
+        setIsRegistered(!qSnap.empty);
+      } catch (err) {
+        console.error('Error checking registration:', err);
+        setIsRegistered(false);
+      }
+    }
+
+    checkRegistration();
+  }, [id, currentUser]);
+
+  const handleCancelRsvp = async () => {
+    if (!currentUser) {
+      router.push('/signin');
+      return;
+    }
+
+    try {
+      setCancelling(true);
+
+      const regsRef = collection(db, 'events', id, 'registrations');
+      const qSnap = await getDocs(
+        query(regsRef, where('userId', '==', currentUser.uid))
+      );
+
+      if (qSnap.empty) {
+        setIsRegistered(false);
+        return;
+      }
+
+      // delete all registrations for this user for this event (usually just one)
+      await Promise.all(qSnap.docs.map((d) => deleteDoc(d.ref)));
+
+      // Update local state so UI reflects new count immediately
+      setIsRegistered(false);
+      setAttendeeCount((prev) => Math.max(0, prev - qSnap.docs.length || 1));
+    } catch (err) {
+      console.error('Error cancelling RSVP:', err);
+      alert('Failed to cancel RSVP. Please try again.');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -109,9 +225,14 @@ export default function EventDetailPage(props) {
     );
   }
 
+  const effectiveAttendees =
+    typeof attendeeCount === 'number' && attendeeCount >= 0
+      ? attendeeCount
+      : event.attendees || 0;
+
   const availableSpots =
-    event.spots && event.attendees
-      ? event.spots - event.attendees
+    event.spots && effectiveAttendees
+      ? Math.max(0, event.spots - effectiveAttendees)
       : event.spots || 0;
 
   return (
@@ -246,7 +367,7 @@ export default function EventDetailPage(props) {
               {/* Attendees */}
               <div className="bg-card/50 backdrop-blur-sm border border-border rounded-2xl p-8">
                 <h2 className="text-2xl font-bold mb-6 text-foreground">
-                  Who&apos;s Coming ({event.attendees})
+                  Who&apos;s Coming ({effectiveAttendees})
                 </h2>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                   {(event.attendeesList || []).map((attendee, index) => (
@@ -303,24 +424,64 @@ export default function EventDetailPage(props) {
                       style={{
                         width:
                           event.spots > 0
-                            ? `${(event.attendees / event.spots) * 100}%`
+                            ? `${(effectiveAttendees / event.spots) * 100}%`
                             : '0%',
                       }}
                     />
                   </div>
 
-                  {/* Register goes to full form page */}
-                  <Link
-                    href={`/member/events/${id}/register`}
-                    className="w-full"
-                  >
-                    <Button
-                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-                      size="lg"
+                  {/* Toggle Register / Cancel */}
+                  {!authLoading && isRegistered ? (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          className="w-full bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                          size="lg"
+                          disabled={cancelling}
+                        >
+                          {cancelling ? 'Cancelling...' : 'Cancel RSVP'}
+                        </Button>
+                      </AlertDialogTrigger>
+
+                      <AlertDialogContent className="bg-card border-border">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="text-foreground">
+                            Cancel your RSVP?
+                          </AlertDialogTitle>
+                          <AlertDialogDescription className="text-muted-foreground">
+                            This will remove your registration and free up your
+                            spot for someone else. Are you sure you want to
+                            cancel?
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+
+                        <AlertDialogFooter>
+                          <AlertDialogCancel className="bg-background border border-border text-foreground">
+                            Keep RSVP
+                          </AlertDialogCancel>
+
+                          <AlertDialogAction
+                            onClick={handleCancelRsvp}
+                            className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+                          >
+                            Yes, Cancel
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  ) : (
+                    <Link
+                      href={`/member/events/${id}/register`}
+                      className="w-full"
                     >
-                      Register for Event
-                    </Button>
-                  </Link>
+                      <Button
+                        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
+                        size="lg"
+                      >
+                        Register for Event
+                      </Button>
+                    </Link>
+                  )}
 
                   <div className="flex gap-2">
                     <Button
