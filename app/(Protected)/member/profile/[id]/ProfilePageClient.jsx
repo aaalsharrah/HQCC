@@ -21,6 +21,8 @@ import {
   Send,
   Loader2,
   Github,
+  Linkedin,
+  Code,
 } from 'lucide-react';
 
 import { auth, db, storage } from '@/app/lib/firebase/firebase';
@@ -83,6 +85,7 @@ export default function ProfilePageClient({ profileId }) {
     location: '',
     website: '',
     github: '',
+    linkedin: '',
   });
 
   const [avatarFile, setAvatarFile] = useState(null);
@@ -146,6 +149,7 @@ export default function ProfilePageClient({ profileId }) {
               location: 'Hempstead, NY',
               website: 'hqcc.hofstra.edu',
               github: '',
+              linkedin: '',
               joined: new Date(),
             };
 
@@ -162,6 +166,7 @@ export default function ProfilePageClient({ profileId }) {
                 location: loadedProfile.location,
                 website: loadedProfile.website,
                 github: loadedProfile.github,
+                linkedin: loadedProfile.linkedin,
                 createdAt: new Date(),
               },
               { merge: true }
@@ -185,6 +190,9 @@ export default function ProfilePageClient({ profileId }) {
               github = website;
             }
 
+            const linkedin =
+              data.linkedin && data.linkedin !== '#' ? data.linkedin : '';
+
             loadedProfile = {
               uid: targetUserId,
               name:
@@ -202,6 +210,7 @@ export default function ProfilePageClient({ profileId }) {
               location: data.location || 'Hempstead, NY',
               website,
               github,
+              linkedin,
               joined: joinedDate,
             };
           }
@@ -216,6 +225,7 @@ export default function ProfilePageClient({ profileId }) {
             location: loadedProfile.location || '',
             website: loadedProfile.website || '',
             github: loadedProfile.github || '',
+            linkedin: loadedProfile.linkedin || '',
           });
 
           // Fetch posts authored by targetUserId
@@ -613,6 +623,7 @@ export default function ProfilePageClient({ profileId }) {
           location: editData.location.trim(),
           website: editData.website.trim(),
           github: editData.github.trim(),
+          linkedin: editData.linkedin.trim(),
           avatar: avatarUrl,
           coverImage: coverUrl,
         },
@@ -629,6 +640,7 @@ export default function ProfilePageClient({ profileId }) {
         location: editData.location.trim(),
         website: editData.website.trim(),
         github: editData.github.trim(),
+        linkedin: editData.linkedin.trim(),
         avatar: avatarUrl,
         coverImage: coverUrl,
       }));
@@ -783,6 +795,31 @@ export default function ProfilePageClient({ profileId }) {
     );
   }
 
+  // ── Social link helpers for display ──────────────────────────────
+  const normalizedWebsite = profile.website
+    ? profile.website.startsWith('http')
+      ? profile.website
+      : `https://${profile.website}`
+    : '';
+
+  const normalizedProfessionalUrl = profile.linkedin
+    ? profile.linkedin.startsWith('http')
+      ? profile.linkedin
+      : `https://${profile.linkedin}`
+    : '';
+
+  const professionalLower = profile.linkedin?.toLowerCase() || '';
+  const isLinkedIn =
+    professionalLower.includes('linkedin.com') ||
+    professionalLower.includes('lnkd.in');
+  const isLeetCode = professionalLower.includes('leetcode.com');
+
+  const professionalLabel = isLinkedIn
+    ? 'LinkedIn'
+    : isLeetCode
+    ? 'LeetCode'
+    : 'Profile';
+
   return (
     <div className="min-h-screen bg-background">
       {/* Cover */}
@@ -888,19 +925,15 @@ export default function ProfilePageClient({ profileId }) {
                     </div>
                   )}
 
-                  {profile.website && (
+                  {normalizedWebsite && (
                     <a
-                      href={
-                        profile.website.startsWith('http')
-                          ? profile.website
-                          : `https://${profile.website}`
-                      }
+                      href={normalizedWebsite}
                       target="_blank"
                       rel="noreferrer"
                       className="flex items-center gap-1 hover:text-primary transition-colors"
                     >
                       <LinkIcon className="h-4 w-4" />
-                      <span>{profile.website}</span>
+                      <span>Personal website</span>
                     </a>
                   )}
 
@@ -917,6 +950,22 @@ export default function ProfilePageClient({ profileId }) {
                     >
                       <Github className="h-4 w-4" />
                       <span>GitHub</span>
+                    </a>
+                  )}
+
+                  {normalizedProfessionalUrl && (
+                    <a
+                      href={normalizedProfessionalUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1 hover:text-primary transition-colors"
+                    >
+                      {isLinkedIn ? (
+                        <Linkedin className="h-4 w-4" />
+                      ) : (
+                        <Code className="h-4 w-4" />
+                      )}
+                      <span>{professionalLabel}</span>
                     </a>
                   )}
 
@@ -1081,6 +1130,25 @@ export default function ProfilePageClient({ profileId }) {
                   />
                 </div>
 
+                {/* LinkedIn / LeetCode */}
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    LinkedIn / LeetCode
+                  </label>
+                  <input
+                    type="text"
+                    value={editData.linkedin}
+                    onChange={(e) =>
+                      setEditData((prev) => ({
+                        ...prev,
+                        linkedin: e.target.value,
+                      }))
+                    }
+                    placeholder="https://linkedin.com/in/you or https://leetcode.com/you"
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+
                 <div className="flex justify-end gap-3 pt-2">
                   <Button
                     type="button"
@@ -1096,6 +1164,7 @@ export default function ProfilePageClient({ profileId }) {
                         location: profile.location || '',
                         website: profile.website || '',
                         github: profile.github || '',
+                        linkedin: profile.linkedin || '',
                       });
                     }}
                   >

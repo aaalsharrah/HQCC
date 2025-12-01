@@ -10,50 +10,58 @@
 /* Light theme (default) */
 :root,
 :root[data-theme='light'] {
-  --background: oklch(0.98 0.004 264);
-  --foreground: oklch(0.12 0.008 264);
+  /* Slightly warm, soft background instead of pure white */
+  --background: oklch(0.96 0.015 255);
+  --foreground: oklch(0.22 0.03 255);
 
-  --card: oklch(0.96 0.006 264);
-  --card-foreground: oklch(0.12 0.008 264);
+  /* Cards just a bit darker than background for separation */
+  --card: oklch(0.94 0.012 255);
+  --card-foreground: var(--foreground);
 
-  --popover: oklch(0.97 0.006 264);
-  --popover-foreground: oklch(0.12 0.008 264);
+  /* Popovers a hair brighter */
+  --popover: oklch(0.97 0.01 255);
+  --popover-foreground: var(--foreground);
 
-  --primary: oklch(0.65 0.22 192);
-  --primary-foreground: oklch(0.98 0.008 264);
+  /* Softer primaries for light mode (quantum / nebula / aurora will still override via data-color-scheme) */
+  --primary: oklch(0.72 0.18 210);
+  --primary-foreground: oklch(0.16 0.03 255);
 
-  --secondary: oklch(0.55 0.19 258);
-  --secondary-foreground: oklch(0.98 0.008 264);
+  --secondary: oklch(0.9 0.04 255);
+  --secondary-foreground: var(--foreground);
 
-  --muted: oklch(0.92 0.008 264);
-  --muted-foreground: oklch(0.45 0.01 264);
+  /* Muted surfaces + text for subtle sections */
+  --muted: oklch(0.93 0.01 255);
+  --muted-foreground: oklch(0.5 0.03 255);
 
-  --accent: oklch(0.7 0.24 192);
-  --accent-foreground: oklch(0.98 0.008 264);
+  --accent: oklch(0.78 0.18 210);
+  --accent-foreground: var(--primary-foreground);
 
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0.008 264);
+  --destructive: oklch(0.65 0.18 27);
+  --destructive-foreground: oklch(0.98 0.01 255);
 
-  --border: oklch(0.88 0.01 264 / 0.2);
-  --input: oklch(0.88 0.01 264);
-  --ring: oklch(0.65 0.22 192);
+  /* Stronger border so components feel defined, but not harsh */
+  --border: oklch(0.86 0.01 255 / 0.4);
+  --input: oklch(0.9 0.01 255);
+  --ring: var(--primary);
 
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  /* Charts still colorful but not neon */
+  --chart-1: oklch(0.7 0.18 40);
+  --chart-2: oklch(0.67 0.13 210);
+  --chart-3: oklch(0.6 0.1 260);
+  --chart-4: oklch(0.78 0.16 120);
+  --chart-5: oklch(0.75 0.16 340);
 
   --radius: 0.75rem;
 
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  /* Sidebar slightly tinted, not full white */
+  --sidebar: oklch(0.95 0.01 255);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-primary: oklch(0.78 0.18 210);
+  --sidebar-primary-foreground: var(--primary-foreground);
+  --sidebar-accent: oklch(0.92 0.01 255);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: oklch(0.88 0.01 255);
+  --sidebar-ring: var(--sidebar-primary);
 }
 
 /* Dark theme – triggered by .dark class OR data-theme="dark" */

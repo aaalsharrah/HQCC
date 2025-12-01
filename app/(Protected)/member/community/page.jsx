@@ -10,6 +10,7 @@ import {
   Loader2,
   GraduationCap,
   Globe,
+  Linkedin,
 } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
@@ -98,19 +99,25 @@ export default function CommunityPage() {
         // Fetch members
         const membersRef = collection(db, 'members');
         const membersSnapshot = await getDocs(membersRef);
-        const membersData = membersSnapshot.docs.map((doc) => {
-          const data = doc.data();
+        const membersData = membersSnapshot.docs.map((docSnap) => {
+          const data = docSnap.data();
+
+          // Normalize linkedin: treat '#' as empty / no link
+          const rawLinkedin = data.linkedin || '';
+          const linkedin =
+            rawLinkedin && rawLinkedin !== '#' ? rawLinkedin : '';
+
           return {
-            id: doc.id,
+            id: docSnap.id,
             name: data.name || 'Member',
-            role: data.role || 'Member',           // 'member' | 'admin'
-            boardRole: data.boardRole || '',       // 'president', etc.
+            role: data.role || 'Member', // 'member' | 'admin'
+            boardRole: data.boardRole || '', // 'president', etc.
             major: data.major || null,
             year: data.year || null,
             email: data.email || '',
             bio: data.bio || '',
             avatar: data.avatar || null,
-            linkedin: data.linkedin || '#',
+            linkedin,
             github: data.github || '#',
             website: data.website || '',
             joinedAt: data.joinedAt || data.createdAt || null,
@@ -148,8 +155,8 @@ export default function CommunityPage() {
           const eventsSnapshot = await getDocs(eventsRef);
 
           const currentYear = new Date().getFullYear();
-          eventsSnapshot.docs.forEach((doc) => {
-            const eventData = doc.data();
+          eventsSnapshot.docs.forEach((docSnap) => {
+            const eventData = docSnap.data();
             let eventDate = null;
 
             if (eventData.date) {
@@ -334,121 +341,179 @@ export default function CommunityPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {members.map((member) => (
-                <Card
-                  key={member.id}
-                  className="relative group p-6 bg-card/50 backdrop-blur-xl border-border hover:border-primary/50 transition-all duration-300 hover:transform hover:scale-[1.02] cursor-pointer flex flex-col"
-                  onClick={() => router.push(`/member/profile/${member.id}`)}
-                >
-                  {/* Avatar + top content */}
-                  <div className="flex flex-col items-center mb-4">
-                    <div className="relative mb-4">
-                      {member.avatar ? (
-                        <Image
-                          src={member.avatar}
-                          alt={member.name}
-                          width={80}
-                          height={80}
-                          className="w-20 h-20 rounded-full object-cover border-2 border-primary/20"
-                          unoptimized={member.avatar.startsWith('http')}
-                        />
-                      ) : (
-                        <div className="w-20 h-20 rounded-full bg-linear-to-br from-primary via-accent to-secondary flex items-center justify-center text-2xl font-bold text-primary-foreground">
-                          {member.avatarInitials}
+              {members.map((member) => {
+                const hasGithub = member.github && member.github !== '#';
+                const hasWebsite = !!member.website;
+
+                const rawProfessional = member.linkedin;
+                const hasProfessional =
+                  !!rawProfessional && rawProfessional !== '#';
+
+                const professionalUrl = hasProfessional
+                  ? rawProfessional.startsWith('http')
+                    ? rawProfessional
+                    : `https://${rawProfessional}`
+                  : '';
+
+                const professionalLower =
+                  rawProfessional?.toLowerCase() || '';
+                const isLinkedIn =
+                  professionalLower.includes('linkedin.com') ||
+                  professionalLower.includes('lnkd.in');
+                const isLeetCode = professionalLower.includes('leetcode.com');
+
+                return (
+                  <Card
+                    key={member.id}
+                    className="relative group p-6 bg-card/50 backdrop-blur-xl border-border hover:border-primary/50 transition-all duration-300 hover:transform hover:scale-[1.02] cursor-pointer flex flex-col"
+                    onClick={() => router.push(`/member/profile/${member.id}`)}
+                  >
+                    {/* Avatar + top content */}
+                    <div className="flex flex-col items-center mb-4">
+                      <div className="relative mb-4">
+                        {member.avatar ? (
+                          <Image
+                            src={member.avatar}
+                            alt={member.name}
+                            width={80}
+                            height={80}
+                            className="w-20 h-20 rounded-full object-cover border-2 border-primary/20"
+                            unoptimized={member.avatar.startsWith('http')}
+                          />
+                        ) : (
+                          <div className="w-20 h-20 rounded-full bg-linear-to-br from-primary via-accent to-secondary flex items-center justify-center text-2xl font-bold text-primary-foreground">
+                            {member.avatarInitials}
+                          </div>
+                        )}
+                        <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-green-500 border-2 border-card" />
+                      </div>
+
+                      <h3 className="text-lg font-bold text-center mb-1 line-clamp-2">
+                        {member.name}
+                      </h3>
+
+                      {/* Badge: Board role for admins, Member for others */}
+                      <Badge
+                        variant="secondary"
+                        className="mb-2 text-center line-clamp-2"
+                      >
+                        {member.boardRole
+                          ? prettyBoardRole(member.boardRole)
+                          : member.role === 'admin'
+                          ? 'Admin'
+                          : 'Member'}
+                      </Badge>
+
+                      {member.major && (
+                        <div className="flex items-center gap-1 text-sm text-foreground/60 mb-1 line-clamp-2">
+                          <GraduationCap className="h-3 w-3 flex-shrink-0" />
+                          <span>{member.major}</span>
                         </div>
                       )}
-                      <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-green-500 border-2 border-card" />
-                    </div>
-
-                    <h3 className="text-lg font-bold text-center mb-1 line-clamp-2">
-                      {member.name}
-                    </h3>
-
-                    {/* Badge: Board role for admins, Member for others */}
-                    <Badge
-                      variant="secondary"
-                      className="mb-2 text-center line-clamp-2"
-                    >
-                      {member.boardRole
-                        ? prettyBoardRole(member.boardRole)
-                        : member.role === 'admin'
-                        ? 'Admin'
-                        : 'Member'}
-                    </Badge>
-
-                    {member.major && (
-                      <div className="flex items-center gap-1 text-sm text-foreground/60 mb-1 line-clamp-2">
-                        <GraduationCap className="h-3 w-3 flex-shrink-0" />
-                        <span>{member.major}</span>
-                      </div>
-                    )}
-                    {member.year && (
-                      <div className="text-xs text-foreground/50">
-                        {member.year}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Interests */}
-                  {member.interests && member.interests.length > 0 && (
-                    <div className="flex flex-col gap-2 mb-4 items-center px-1 w-full">
-                      {member.interests.map((interest, i) => (
-                        <Badge
-                          key={i}
-                          variant="outline"
-                          className="text-xs px-3 py-1 line-clamp-2 max-w-[240px] whitespace-normal break-words text-center"
-                        >
-                          {interest}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Social Links */}
-                  <div className="mt-auto">
-                    <div
-                      className="flex gap-2 justify-center pt-4 border-t border-border/50"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      {member.github && member.github !== '#' && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 hover:text-primary"
-                          asChild
-                        >
-                          <a
-                            href={member.github}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label="GitHub"
-                          >
-                            <Github className="h-4 w-4" />
-                          </a>
-                        </Button>
-                      )}
-
-                      {member.website && (
-                        <Button
-                          size="icon"
-                          variant="ghost"
-                          className="h-8 w-8 hover:text-primary"
-                          asChild
-                        >
-                          <a
-                            href={member.website}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            aria-label="Personal website"
-                          >
-                            <Globe className="h-4 w-4" />
-                          </a>
-                        </Button>
+                      {member.year && (
+                        <div className="text-xs text-foreground/50">
+                          {member.year}
+                        </div>
                       )}
                     </div>
-                  </div>
-                </Card>
-              ))}
+
+                    {/* Interests */}
+                    {member.interests && member.interests.length > 0 && (
+                      <div className="flex flex-col gap-2 mb-4 items-center px-1 w-full">
+                        {member.interests.map((interest, i) => (
+                          <Badge
+                            key={i}
+                            variant="outline"
+                            className="text-xs px-3 py-1 line-clamp-2 max-w-[240px] whitespace-normal break-words text-center"
+                          >
+                            {interest}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Social Links */}
+                    <div className="mt-auto">
+                      <div
+                        className="flex gap-2 justify-center pt-4 border-t border-border/50"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        {hasGithub && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 hover:text-primary"
+                            asChild
+                          >
+                            <a
+                              href={
+                                member.github.startsWith('http')
+                                  ? member.github
+                                  : `https://${member.github}`
+                              }
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label="GitHub"
+                            >
+                              <Github className="h-4 w-4" />
+                            </a>
+                          </Button>
+                        )}
+
+                        {hasWebsite && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 hover:text-primary"
+                            asChild
+                          >
+                            <a
+                              href={
+                                member.website.startsWith('http')
+                                  ? member.website
+                                  : `https://${member.website}`
+                              }
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label="Personal website"
+                            >
+                              <Globe className="h-4 w-4" />
+                            </a>
+                          </Button>
+                        )}
+
+                        {hasProfessional && (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-8 w-8 hover:text-primary"
+                            asChild
+                          >
+                            <a
+                              href={professionalUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label={
+                                isLinkedIn
+                                  ? 'LinkedIn'
+                                  : isLeetCode
+                                  ? 'LeetCode'
+                                  : 'Profile'
+                              }
+                            >
+                              {isLinkedIn ? (
+                                <Linkedin className="h-4 w-4" />
+                              ) : (
+                                <Code className="h-4 w-4" />
+                              )}
+                            </a>
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
             </div>
           )}
         </div>
