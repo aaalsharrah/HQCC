@@ -192,8 +192,7 @@ export default function ProfilePageClient({ profileId }) {
                 user.displayName ||
                 user.email?.split('@')[0] ||
                 'Member',
-              username:
-                data.username || data.email?.split('@')[0] || 'member',
+              username: data.username || data.email?.split('@')[0] || 'member',
               email: data.email || user.email || '',
               avatar: data.avatar || user.photoURL || null,
               coverImage:
@@ -561,9 +560,7 @@ export default function ProfilePageClient({ profileId }) {
               'Permission denied. Please check Firebase Storage security rules.'
             );
           } else if (uploadError.code === 'storage/quota-exceeded') {
-            throw new Error(
-              'Storage quota exceeded. Please contact support.'
-            );
+            throw new Error('Storage quota exceeded. Please contact support.');
           } else if (uploadError.code === 'storage/unauthenticated') {
             throw new Error('You must be logged in to upload images.');
           } else {
@@ -589,9 +586,7 @@ export default function ProfilePageClient({ profileId }) {
               'Permission denied. Please check Firebase Storage security rules.'
             );
           } else if (uploadError.code === 'storage/quota-exceeded') {
-            throw new Error(
-              'Storage quota exceeded. Please contact support.'
-            );
+            throw new Error('Storage quota exceeded. Please contact support.');
           } else if (uploadError.code === 'storage/unauthenticated') {
             throw new Error('You must be logged in to upload images.');
           } else {
@@ -629,9 +624,7 @@ export default function ProfilePageClient({ profileId }) {
         ...prev,
         name: editData.name.trim() || prev.name,
         username:
-          editData.username.trim() ||
-          prev.username ||
-          prev.email.split('@')[0],
+          editData.username.trim() || prev.username || prev.email.split('@')[0],
         bio: editData.bio.trim(),
         location: editData.location.trim(),
         website: editData.website.trim(),
@@ -700,9 +693,7 @@ export default function ProfilePageClient({ profileId }) {
           </div>
         </div>
 
-        <p className="text-foreground mb-4 leading-relaxed">
-          {post.content}
-        </p>
+        <p className="text-foreground mb-4 leading-relaxed">{post.content}</p>
 
         {post.image && (
           <div className="mb-4 rounded-lg overflow-hidden border border-border/50">

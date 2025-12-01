@@ -47,22 +47,15 @@ export default function SettingsPage() {
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // Preferences
+  // Preferences (only things we actually show in UI)
   const [privacy, setPrivacy] = useState({
-    privateProfile: false,
     showEmail: false,
-    showLocation: true,
-    allowTags: true,
-    allowDMs: true,
   });
 
   const [notifications, setNotifications] = useState({
     emailNotifications: true,
-    pushNotifications: true,
     postLikes: true,
     postComments: true,
-    newFollowers: true,
-    mentions: true,
     eventReminders: true,
   });
 
@@ -105,20 +98,14 @@ export default function SettingsPage() {
             website: 'hqcc.hofstra.edu',
             avatar: user.photoURL || '/quantum-computing-student.jpg',
             createdAt: serverTimestamp(),
+            // only the fields we care about now
             privacy: {
-              privateProfile: false,
               showEmail: false,
-              showLocation: true,
-              allowTags: true,
-              allowDMs: true,
             },
             notifications: {
               emailNotifications: true,
-              pushNotifications: true,
               postLikes: true,
               postComments: true,
-              newFollowers: true,
-              mentions: true,
               eventReminders: true,
             },
             appearance: {
@@ -148,21 +135,17 @@ export default function SettingsPage() {
           };
 
           setProfile(loadedProfile);
+
+          // Safely load only the fields we support now
           setPrivacy({
-            privateProfile: data.privacy?.privateProfile ?? false,
             showEmail: data.privacy?.showEmail ?? false,
-            showLocation: data.privacy?.showLocation ?? true,
-            allowTags: data.privacy?.allowTags ?? true,
-            allowDMs: data.privacy?.allowDMs ?? true,
           });
 
           setNotifications({
-            emailNotifications: data.notifications?.emailNotifications ?? true,
-            pushNotifications: data.notifications?.pushNotifications ?? true,
+            emailNotifications:
+              data.notifications?.emailNotifications ?? true,
             postLikes: data.notifications?.postLikes ?? true,
             postComments: data.notifications?.postComments ?? true,
-            newFollowers: data.notifications?.newFollowers ?? true,
-            mentions: data.notifications?.mentions ?? true,
             eventReminders: data.notifications?.eventReminders ?? true,
           });
 
@@ -253,6 +236,7 @@ export default function SettingsPage() {
     }
   };
 
+  // ✅ Save privacy to Firestore
   const handleSavePrivacy = async () => {
     if (!currentUser) return;
     setSavingPrivacy(true);
@@ -269,6 +253,7 @@ export default function SettingsPage() {
     }
   };
 
+  // ✅ Save notifications to Firestore
   const handleSaveNotifications = async () => {
     if (!currentUser) return;
     setSavingNotifications(true);
@@ -451,7 +436,7 @@ export default function SettingsPage() {
                   </Button>
                 </div>
 
-                {/* Danger Zone (same as before) */}
+                {/* Danger Zone */}
                 <div className="space-y-4 pt-4 border-t border-border/50">
                   <h3 className="text-lg font-semibold text-destructive">
                     Danger Zone
@@ -477,31 +462,8 @@ export default function SettingsPage() {
               </h2>
 
               <div className="space-y-6">
-                <div className="flex items-center justify-between py-4 border-b border-border/50">
-                  <div className="space-y-1">
-                    <Label
-                      htmlFor="private-profile"
-                      className="text-base font-medium"
-                    >
-                      Private Profile
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Only approved followers can see your posts
-                    </p>
-                  </div>
-                  <Switch
-                    id="private-profile"
-                    checked={privacy.privateProfile}
-                    onCheckedChange={(checked) =>
-                      setPrivacy({
-                        ...privacy,
-                        privateProfile: checked,
-                      })
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between py-4 border-b border-border/50">
+                {/* Show Email ONLY */}
+                <div className="flex items-center justify-between py-4">
                   <div className="space-y-1">
                     <Label
                       htmlFor="show-email"
@@ -525,86 +487,14 @@ export default function SettingsPage() {
                   />
                 </div>
 
-                <div className="flex items-center justify-between py-4 border-b border-border/50">
-                  <div className="space-y-1">
-                    <Label
-                      htmlFor="show-location"
-                      className="text-base font-medium"
-                    >
-                      Show Location
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Display your location on your profile
-                    </p>
-                  </div>
-                  <Switch
-                    id="show-location"
-                    checked={privacy.showLocation}
-                    onCheckedChange={(checked) =>
-                      setPrivacy({
-                        ...privacy,
-                        showLocation: checked,
-                      })
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between py-4 border-b border-border/50">
-                  <div className="space-y-1">
-                    <Label
-                      htmlFor="allow-tags"
-                      className="text-base font-medium"
-                    >
-                      Allow Tags
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Let others tag you in posts
-                    </p>
-                  </div>
-                  <Switch
-                    id="allow-tags"
-                    checked={privacy.allowTags}
-                    onCheckedChange={(checked) =>
-                      setPrivacy({
-                        ...privacy,
-                        allowTags: checked,
-                      })
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between py-4">
-                  <div className="space-y-1">
-                    <Label
-                      htmlFor="allow-dms"
-                      className="text-base font-medium"
-                    >
-                      Allow Direct Messages
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Anyone can send you direct messages
-                    </p>
-                  </div>
-                  <Switch
-                    id="allow-dms"
-                    checked={privacy.allowDMs}
-                    onCheckedChange={(checked) =>
-                      setPrivacy({
-                        ...privacy,
-                        allowDMs: checked,
-                      })
-                    }
-                  />
-                </div>
-
                 <div className="flex justify-end pt-4">
                   <Button
                     onClick={handleSavePrivacy}
                     className="bg-primary hover:bg-primary/90 gap-2"
                     disabled={savingPrivacy}
                   >
-                    <Save className="h-4 w-4" />
-                    {savingPrivacy ? 'Saving...' : 'Save Changes'}
+                      <Save className="h-4 w-4" />
+                      {savingPrivacy ? 'Saving...' : 'Save Changes'}
                   </Button>
                 </div>
               </div>
@@ -624,6 +514,7 @@ export default function SettingsPage() {
                     General
                   </h3>
 
+                  {/* Email Notifications ONLY */}
                   <div className="flex items-center justify-between py-3">
                     <div className="space-y-1">
                       <Label
@@ -643,30 +534,6 @@ export default function SettingsPage() {
                         setNotifications({
                           ...notifications,
                           emailNotifications: checked,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between py-3">
-                    <div className="space-y-1">
-                      <Label
-                        htmlFor="push-notifications"
-                        className="text-base font-medium"
-                      >
-                        Push Notifications
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        Receive push notifications on your device
-                      </p>
-                    </div>
-                    <Switch
-                      id="push-notifications"
-                      checked={notifications.pushNotifications}
-                      onCheckedChange={(checked) =>
-                        setNotifications({
-                          ...notifications,
-                          pushNotifications: checked,
                         })
                       }
                     />
@@ -721,54 +588,6 @@ export default function SettingsPage() {
                         setNotifications({
                           ...notifications,
                           postComments: checked,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between py-3">
-                    <div className="space-y-1">
-                      <Label
-                        htmlFor="new-followers"
-                        className="text-base font-medium"
-                      >
-                        New Followers
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        When someone follows you
-                      </p>
-                    </div>
-                    <Switch
-                      id="new-followers"
-                      checked={notifications.newFollowers}
-                      onCheckedChange={(checked) =>
-                        setNotifications({
-                          ...notifications,
-                          newFollowers: checked,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="flex items-center justify-between py-3">
-                    <div className="space-y-1">
-                      <Label
-                        htmlFor="mentions"
-                        className="text-base font-medium"
-                      >
-                        Mentions
-                      </Label>
-                      <p className="text-sm text-muted-foreground">
-                        When someone mentions you
-                      </p>
-                    </div>
-                    <Switch
-                      id="mentions"
-                      checked={notifications.mentions}
-                      onCheckedChange={(checked) =>
-                        setNotifications({
-                          ...notifications,
-                          mentions: checked,
                         })
                       }
                     />
