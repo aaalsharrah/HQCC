@@ -833,14 +833,12 @@ export default function AdminDashboard() {
               </p>
             </div>
             <div className="flex gap-3">
-              <Button className="bg-primary hover:bg-primary/90 text-primary-foreground">
-                <UserPlus className="h-4 w-4 mr-2" />
-                Add User
-              </Button>
-              <Button variant="outline">
-                <Settings className="h-4 w-4 mr-2" />
-                Settings
-              </Button>
+              <Link href="/member/settings">
+                <Button variant="outline">
+                  <Settings className="h-4 w-4 mr-2" />
+                  Settings
+                </Button>
+              </Link>
             </div>
           </div>
         </div>
@@ -1117,10 +1115,6 @@ export default function AdminDashboard() {
                     <Button variant="outline" className="gap-2 bg-transparent">
                       <Filter className="h-4 w-4" />
                       Filter
-                    </Button>
-                    <Button className="bg-primary hover:bg-primary/90 text-primary-foreground gap-2">
-                      <UserPlus className="h-4 w-4" />
-                      Add User
                     </Button>
                   </div>
                 </div>
