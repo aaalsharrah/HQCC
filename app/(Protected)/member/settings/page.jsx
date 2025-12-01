@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTheme } from '@/app/context/ThemeContext';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -27,6 +28,10 @@ import {
   setDoc,
   updateDoc,
   serverTimestamp,
+  collection,
+  query,
+  where,
+  getDocs,
 } from 'firebase/firestore';
 
 export default function SettingsPage() {
@@ -59,11 +64,35 @@ export default function SettingsPage() {
     eventReminders: true,
   });
 
-  const [appearance, setAppearance] = useState({
-    theme: 'dark',
-    fontSize: 'medium',
-    colorScheme: 'quantum',
-  });
+  // 🧑‍💼 Board role (President / VP / Secretary / Treasurer)
+  const [boardRole, setBoardRole] = useState(''); // '', 'president', 'vice_president', 'secretary', 'treasurer'
+
+  // 🔐 Admin flag (derived from Firestore `role` field)
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  // 🌗 Theme context (global, single source of truth)
+  const { appearance, updateAppearance } = useTheme();
+
+  const handleAppearanceChange = (patch) => {
+    // patch-style: { theme: 'dark' }, { fontSize: 'large' }, { colorScheme: 'nebula' }
+    updateAppearance(patch);
+  };
+
+  // Helper to prettify role name for alerts
+  const prettyRole = (value) => {
+    switch (value) {
+      case 'president':
+        return 'President';
+      case 'vice_president':
+        return 'Vice President';
+      case 'secretary':
+        return 'Secretary';
+      case 'treasurer':
+        return 'Treasurer';
+      default:
+        return 'Board Member';
+    }
+  };
 
   // Load user + member doc
   useEffect(() => {
@@ -98,6 +127,10 @@ export default function SettingsPage() {
             website: 'hqcc.hofstra.edu',
             avatar: user.photoURL || '/quantum-computing-student.jpg',
             createdAt: serverTimestamp(),
+
+            // 🔑 your existing role field
+            role: 'member', // 'member' | 'admin'
+
             // only the fields we care about now
             privacy: {
               showEmail: false,
@@ -108,6 +141,10 @@ export default function SettingsPage() {
               postComments: true,
               eventReminders: true,
             },
+
+            // Board role starts empty
+            boardRole: '',
+
             appearance: {
               theme: 'dark',
               fontSize: 'medium',
@@ -124,7 +161,11 @@ export default function SettingsPage() {
           });
           setPrivacy(defaultData.privacy);
           setNotifications(defaultData.notifications);
-          setAppearance(defaultData.appearance);
+          setBoardRole(defaultData.boardRole || '');
+          setIsAdmin(defaultData.role === 'admin'); // false for new members
+
+          // sync ThemeContext to this default appearance
+          updateAppearance(defaultData.appearance);
         } else {
           const data = snap.data();
 
@@ -142,18 +183,25 @@ export default function SettingsPage() {
           });
 
           setNotifications({
-            emailNotifications:
-              data.notifications?.emailNotifications ?? true,
+            emailNotifications: data.notifications?.emailNotifications ?? true,
             postLikes: data.notifications?.postLikes ?? true,
             postComments: data.notifications?.postComments ?? true,
             eventReminders: data.notifications?.eventReminders ?? true,
           });
 
-          setAppearance({
+          setBoardRole(data.boardRole || '');
+
+          // 🔐 derive admin status from `role` field
+          setIsAdmin(data.role === 'admin');
+
+          const loadedAppearance = {
             theme: data.appearance?.theme || 'dark',
             fontSize: data.appearance?.fontSize || 'medium',
             colorScheme: data.appearance?.colorScheme || 'quantum',
-          });
+          };
+
+          // sync ThemeContext so whole app matches profile
+          updateAppearance(loadedAppearance);
         }
       } catch (err) {
         console.error('Error loading settings:', err);
@@ -163,6 +211,7 @@ export default function SettingsPage() {
     });
 
     return () => unsub();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   // ✅ Update email
@@ -236,18 +285,56 @@ export default function SettingsPage() {
     }
   };
 
-  // ✅ Save privacy to Firestore
+  // ✅ Save privacy + (if admin) board role to Firestore
   const handleSavePrivacy = async () => {
     if (!currentUser) return;
     setSavingPrivacy(true);
+
     try {
+      let boardRoleToSave = boardRole;
+
+      // 🛡 Only admins can claim / change board roles
+      if (isAdmin && boardRole) {
+        const membersRef = collection(db, 'members');
+        const q = query(membersRef, where('boardRole', '==', boardRole));
+        const snap = await getDocs(q);
+
+        const takenBySomeoneElse = snap.docs.find(
+          (docSnap) => docSnap.id !== currentUser.uid
+        );
+
+        if (takenBySomeoneElse) {
+          const label = prettyRole(boardRole);
+          alert(
+            `${label} role is already taken by another member. Please choose a different role.`
+          );
+          setSavingPrivacy(false);
+          return;
+        }
+      }
+
+      // If user is not admin, never let them change boardRole
+      if (!isAdmin) {
+        boardRoleToSave = undefined; // don't touch this field at all
+      }
+
       const ref = doc(db, 'members', currentUser.uid);
-      await updateDoc(ref, {
+
+      const updatePayload = {
         privacy,
         updatedAt: serverTimestamp(),
-      });
+      };
+
+      if (isAdmin) {
+        updatePayload.boardRole = boardRoleToSave || '';
+      }
+
+      await updateDoc(ref, updatePayload);
+
+      alert('Privacy settings updated.');
     } catch (err) {
-      console.error('Error saving privacy:', err);
+      console.error('Error saving privacy/role:', err);
+      alert('Failed to save privacy settings.');
     } finally {
       setSavingPrivacy(false);
     }
@@ -270,6 +357,7 @@ export default function SettingsPage() {
     }
   };
 
+  // ✅ Save appearance to Firestore (ThemeContext already applied live)
   const handleSaveAppearance = async () => {
     if (!currentUser) return;
     setSavingAppearance(true);
@@ -487,14 +575,42 @@ export default function SettingsPage() {
                   />
                 </div>
 
+                {/* Board Role selection – ADMIN ONLY */}
+                {isAdmin && (
+                  <div className="pt-4 border-t border-border/50 space-y-2">
+                    <Label
+                      htmlFor="board-role"
+                      className="text-base font-medium"
+                    >
+                      Board Role (Admin / Board Members)
+                    </Label>
+                    <p className="text-sm text-muted-foreground">
+                      Assign yourself a club board position. Each role can only
+                      be claimed by one member at a time.
+                    </p>
+                    <select
+                      id="board-role"
+                      value={boardRole}
+                      onChange={(e) => setBoardRole(e.target.value)}
+                      className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    >
+                      <option value="">None</option>
+                      <option value="president">President</option>
+                      <option value="vice_president">Vice President</option>
+                      <option value="secretary">Secretary</option>
+                      <option value="treasurer">Treasurer</option>
+                    </select>
+                  </div>
+                )}
+
                 <div className="flex justify-end pt-4">
                   <Button
                     onClick={handleSavePrivacy}
                     className="bg-primary hover:bg-primary/90 gap-2"
                     disabled={savingPrivacy}
                   >
-                      <Save className="h-4 w-4" />
-                      {savingPrivacy ? 'Saving...' : 'Save Changes'}
+                    <Save className="h-4 w-4" />
+                    {savingPrivacy ? 'Saving...' : 'Save Changes'}
                   </Button>
                 </div>
               </div>
@@ -640,13 +756,12 @@ export default function SettingsPage() {
               </h2>
 
               <div className="space-y-6">
+                {/* Theme mode */}
                 <div className="space-y-2">
                   <Label htmlFor="theme">Theme</Label>
                   <div className="grid grid-cols-3 gap-4">
                     <button
-                      onClick={() =>
-                        setAppearance({ ...appearance, theme: 'light' })
-                      }
+                      onClick={() => handleAppearanceChange({ theme: 'light' })}
                       className={`p-4 rounded-lg border-2 transition-all ${
                         appearance.theme === 'light'
                           ? 'border-primary bg-primary/10'
@@ -657,9 +772,7 @@ export default function SettingsPage() {
                       <p className="text-sm font-medium">Light</p>
                     </button>
                     <button
-                      onClick={() =>
-                        setAppearance({ ...appearance, theme: 'dark' })
-                      }
+                      onClick={() => handleAppearanceChange({ theme: 'dark' })}
                       className={`p-4 rounded-lg border-2 transition-all ${
                         appearance.theme === 'dark'
                           ? 'border-primary bg-primary/10'
@@ -670,9 +783,7 @@ export default function SettingsPage() {
                       <p className="text-sm font-medium">Dark</p>
                     </button>
                     <button
-                      onClick={() =>
-                        setAppearance({ ...appearance, theme: 'auto' })
-                      }
+                      onClick={() => handleAppearanceChange({ theme: 'auto' })}
                       className={`p-4 rounded-lg border-2 transition-all ${
                         appearance.theme === 'auto'
                           ? 'border-primary bg-primary/10'
@@ -685,6 +796,7 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
+                {/* Font size */}
                 <div className="space-y-2">
                   <Label htmlFor="font-size">Font Size</Label>
                   <div className="grid grid-cols-3 gap-4">
@@ -692,7 +804,7 @@ export default function SettingsPage() {
                       <button
                         key={size}
                         onClick={() =>
-                          setAppearance({ ...appearance, fontSize: size })
+                          handleAppearanceChange({ fontSize: size })
                         }
                         className={`p-4 rounded-lg border-2 transition-all ${
                           appearance.fontSize === size
@@ -719,15 +831,13 @@ export default function SettingsPage() {
                   </div>
                 </div>
 
+                {/* Color scheme */}
                 <div className="space-y-2">
                   <Label>Color Scheme</Label>
                   <div className="grid grid-cols-3 gap-4">
                     <button
                       onClick={() =>
-                        setAppearance({
-                          ...appearance,
-                          colorScheme: 'quantum',
-                        })
+                        handleAppearanceChange({ colorScheme: 'quantum' })
                       }
                       className={`p-4 rounded-lg border-2 transition-all ${
                         appearance.colorScheme === 'quantum'
@@ -740,10 +850,7 @@ export default function SettingsPage() {
                     </button>
                     <button
                       onClick={() =>
-                        setAppearance({
-                          ...appearance,
-                          colorScheme: 'nebula',
-                        })
+                        handleAppearanceChange({ colorScheme: 'nebula' })
                       }
                       className={`p-4 rounded-lg border-2 transition-all ${
                         appearance.colorScheme === 'nebula'
@@ -756,10 +863,7 @@ export default function SettingsPage() {
                     </button>
                     <button
                       onClick={() =>
-                        setAppearance({
-                          ...appearance,
-                          colorScheme: 'aurora',
-                        })
+                        handleAppearanceChange({ colorScheme: 'aurora' })
                       }
                       className={`p-4 rounded-lg border-2 transition-all ${
                         appearance.colorScheme === 'aurora'

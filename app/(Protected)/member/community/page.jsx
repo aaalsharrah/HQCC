@@ -47,20 +47,38 @@ function parseInterests(bio) {
   return bio.length > 30 ? ['Quantum Computing'] : [bio];
 }
 
-// Helper to prioritize leadership/admin at top
-function getRolePriority(roleRaw) {
+// Pretty label for board roles
+function prettyBoardRole(role) {
+  switch (role) {
+    case 'president':
+      return 'President';
+    case 'vice_president':
+      return 'Vice President';
+    case 'secretary':
+      return 'Secretary';
+    case 'treasurer':
+      return 'Treasurer';
+    default:
+      return role || 'Member';
+  }
+}
+
+// Helper to prioritize leadership/board at top
+function getRolePriority(boardRoleRaw, roleRaw) {
+  const boardRole = (boardRoleRaw || '').toLowerCase();
   const role = (roleRaw || '').toLowerCase();
 
-  if (
-    role.includes('admin') ||
-    role.includes('president') ||
-    role.includes('co-founder') ||
-    role.includes('founder')
-  )
-    return 0; // top leadership
-  if (role.includes('board')) return 1;
-  if (role.includes('vice') || role.includes('lead')) return 2;
-  return 3; // general members
+  // Board roles first
+  if (boardRole === 'president') return 0;
+  if (boardRole === 'vice_president') return 1;
+  if (boardRole === 'secretary') return 2;
+  if (boardRole === 'treasurer') return 3;
+
+  // Then admins with no specific boardRole
+  if (role === 'admin') return 4;
+
+  // General members
+  return 5;
 }
 
 export default function CommunityPage() {
@@ -85,7 +103,8 @@ export default function CommunityPage() {
           return {
             id: doc.id,
             name: data.name || 'Member',
-            role: data.role || 'Member',
+            role: data.role || 'Member',           // 'member' | 'admin'
+            boardRole: data.boardRole || '',       // 'president', etc.
             major: data.major || null,
             year: data.year || null,
             email: data.email || '',
@@ -93,12 +112,12 @@ export default function CommunityPage() {
             avatar: data.avatar || null,
             linkedin: data.linkedin || '#',
             github: data.github || '#',
-            website: data.website || '', // ✅ NEW
+            website: data.website || '',
             joinedAt: data.joinedAt || data.createdAt || null,
           };
         });
 
-        // Generate avatar initials, parse interests & sort (admin/board first)
+        // Generate avatar initials, parse interests & sort (board/admin first)
         const processedMembers = membersData
           .map((member) => ({
             ...member,
@@ -106,8 +125,8 @@ export default function CommunityPage() {
             interests: parseInterests(member.bio),
           }))
           .sort((a, b) => {
-            const pa = getRolePriority(a.role);
-            const pb = getRolePriority(b.role);
+            const pa = getRolePriority(a.boardRole, a.role);
+            const pb = getRolePriority(b.boardRole, b.role);
             if (pa !== pb) return pa - pb;
             return (a.name || '').localeCompare(b.name || '');
           });
@@ -165,7 +184,9 @@ export default function CommunityPage() {
         const thirtyDaysAgo = new Date(
           now.getTime() - 30 * 24 * 60 * 60 * 1000
         );
-        const sixtyDaysAgo = new Date(now.getTime() - 60 * 24 * 60 * 60 * 1000);
+        const sixtyDaysAgo = new Date(
+          now.getTime() - 60 * 24 * 60 * 60 * 1000
+        );
 
         const recentMembers = membersData.filter((m) => {
           if (!m.joinedAt) return false;
@@ -343,11 +364,16 @@ export default function CommunityPage() {
                       {member.name}
                     </h3>
 
+                    {/* Badge: Board role for admins, Member for others */}
                     <Badge
                       variant="secondary"
                       className="mb-2 text-center line-clamp-2"
                     >
-                      {member.role}
+                      {member.boardRole
+                        ? prettyBoardRole(member.boardRole)
+                        : member.role === 'admin'
+                        ? 'Admin'
+                        : 'Member'}
                     </Badge>
 
                     {member.major && (
@@ -378,7 +404,6 @@ export default function CommunityPage() {
                     </div>
                   )}
 
-                  {/* Social Links */}
                   {/* Social Links */}
                   <div className="mt-auto">
                     <div
