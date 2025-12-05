@@ -9,7 +9,6 @@ import {
   Search,
   Filter,
   MoreVertical,
-  UserPlus,
   Mail,
   Trash2,
   Edit,
@@ -34,9 +33,6 @@ import {
   getDoc,
   Timestamp,
   addDoc,
-  query,
-  where,
-  orderBy,
   updateDoc,
   deleteDoc,
 } from 'firebase/firestore';
@@ -59,7 +55,7 @@ export default function AdminDashboard() {
     engagementRate: 0,
   });
   const [loading, setLoading] = useState(true);
-  const [editingEventId, setEditingEventId] = useState(null); // ✅ NEW
+  const [editingEventId, setEditingEventId] = useState(null);
 
   const [form, setForm] = useState({
     title: '',
@@ -75,10 +71,10 @@ export default function AdminDashboard() {
     organizerAvatar: '',
     agendaText: '',
     requirementsText: '',
-    whosComingText: '', // ✅ NEW
+    whosComingText: '',
   });
 
-  // Helper function to format date
+  // helper: format member join date
   function formatDate(timestamp) {
     if (!timestamp) return 'N/A';
     const date =
@@ -93,7 +89,7 @@ export default function AdminDashboard() {
     });
   }
 
-  // Helper function to parse event date
+  // helper: parse event date from Firestore/string
   function parseEventDate(dateField) {
     if (!dateField) return null;
     if (dateField instanceof Timestamp) return dateField.toDate();
@@ -102,50 +98,35 @@ export default function AdminDashboard() {
     return null;
   }
 
-  // Helper function to format date consistently (YYYY-MM-DD) using UTC
+  // helper: normalize date -> YYYY-MM-DD (UTC) for <input type="date" />
   function formatEventDate(eventDate) {
     if (!eventDate) return '';
-    // Use UTC methods to ensure date doesn't shift based on timezone
     const year = eventDate.getUTCFullYear();
     const month = String(eventDate.getUTCMonth() + 1).padStart(2, '0');
     const day = String(eventDate.getUTCDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
   }
 
-  // Fetch all data from Firestore
   useEffect(() => {
-    console.log('Admin dashboard useEffect triggered');
-
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        console.error('No authenticated user');
         setLoading(false);
         return;
       }
 
-      console.log('User authenticated:', user.uid);
-
-      // Verify user is admin
       try {
         const userDocRef = doc(db, 'members', user.uid);
         const userDocSnap = await getDoc(userDocRef);
-
         if (!userDocSnap.exists()) {
-          console.error('User member document does not exist');
           setLoading(false);
           return;
         }
-
         const userData = userDocSnap.data();
-        console.log('User role:', userData.role);
-
         if (userData.role !== 'admin') {
-          console.error('User is not admin, role:', userData.role);
           setLoading(false);
           return;
         }
 
-        // User is admin, proceed with data fetch
         await fetchData();
       } catch (err) {
         console.error('Error checking admin status:', err);
@@ -155,73 +136,69 @@ export default function AdminDashboard() {
 
     async function fetchData() {
       try {
-        console.log('Starting data fetch...');
         setLoading(true);
 
-        // Fetch members
+        // --- members ---
         const membersRef = collection(db, 'members');
         const membersSnapshot = await getDocs(membersRef);
-        const membersData = membersSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          uid: doc.id, // Document ID is the UID
-          ...doc.data(),
+        const membersData = membersSnapshot.docs.map((d) => ({
+          id: d.id,
+          uid: d.id,
+          ...d.data(),
         }));
 
-        console.log('Fetched members:', membersData.length);
-        if (membersData.length > 0) {
-          console.log('Sample member data:', {
-            id: membersData[0].id,
-            uid: membersData[0].uid,
-            name: membersData[0].name,
-            email: membersData[0].email,
-            createdAt: membersData[0].createdAt,
-            joinedAt: membersData[0].joinedAt,
-            role: membersData[0].role,
-          });
-        } else {
-          console.warn('No members found in Firestore!');
-        }
-
-        // Fetch posts
+        // --- posts ---
         const postsRef = collection(db, 'posts');
         const postsSnapshot = await getDocs(postsRef);
-        const postsData = postsSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
+        const postsData = postsSnapshot.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
         }));
 
-        // Fetch events
+        // --- events ---
         const eventsRef = collection(db, 'events');
         const eventsSnapshot = await getDocs(eventsRef);
-        const eventsData = eventsSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
+        const eventsData = eventsSnapshot.docs.map((d) => ({
+          id: d.id,
+          ...d.data(),
         }));
 
-        console.log('Admin dashboard - Fetched events:', eventsData.length);
-        if (eventsData.length > 0) {
-          console.log('Admin dashboard - Sample event:', {
-            id: eventsData[0].id,
-            title: eventsData[0].title,
-            date: eventsData[0].date,
-            dateType: typeof eventsData[0].date,
-          });
+        // --- registrations from subcollections ---
+        // We flatten all events/{eventId}/registrations into one array.
+        const allRegistrations = [];
+        for (const eventDoc of eventsSnapshot.docs) {
+          try {
+            const regsRef = collection(
+              db,
+              'events',
+              eventDoc.id,
+              'registrations'
+            );
+            const regsSnap = await getDocs(regsRef);
+            regsSnap.docs.forEach((regDoc) => {
+              allRegistrations.push({
+                id: regDoc.id,
+                eventId: eventDoc.id,
+                ...regDoc.data(),
+              });
+            });
+          } catch (e) {
+            console.error(
+              'Error loading registrations subcollection for event',
+              eventDoc.id,
+              e
+            );
+          }
         }
 
-        // Fetch registrations
-        const registrationsRef = collection(db, 'registrations');
-        const registrationsSnapshot = await getDocs(registrationsRef);
-        const registrationsData = registrationsSnapshot.docs.map((doc) => ({
-          id: doc.id,
-          ...doc.data(),
-        }));
+        // --- analytics ---
 
-        // Calculate statistics
         const totalUsers = membersData.length;
 
-        // Active users: members who posted in last 30 days
+        // active users: posted in last 30 days
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
         const recentPosts = postsData.filter((post) => {
           if (!post.createdAt) return false;
           const postDate =
@@ -232,12 +209,13 @@ export default function AdminDashboard() {
               : new Date(post.createdAt);
           return postDate >= thirtyDaysAgo;
         });
+
         const activeUserIds = new Set(recentPosts.map((p) => p.authorId));
         const activeUsers = membersData.filter((m) =>
           activeUserIds.has(m.uid || m.id)
         ).length;
 
-        // New users this month
+        // new users this month
         const now = new Date();
         const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
         const newUsersThisMonth = membersData.filter((m) => {
@@ -252,26 +230,32 @@ export default function AdminDashboard() {
           return createdDate >= monthStart;
         }).length;
 
-        // Total events
+        // events stats
         const totalEvents = eventsData.length;
+        const todayMidnight = new Date();
+        todayMidnight.setHours(0, 0, 0, 0);
 
-        // Upcoming events
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const upcomingEvents = eventsData.filter((event) => {
-          const eventDate = parseEventDate(event.date);
-          return eventDate && eventDate >= today;
+        const upcomingEvents = eventsData.filter((e) => {
+          const eventDate = parseEventDate(e.date);
+          return eventDate && eventDate >= todayMidnight;
         }).length;
 
-        // Avg attendance from registrations
-        const attendanceByEvent = {};
-        registrationsData.forEach((reg) => {
-          const eventId = reg.eventId || reg.event;
-          if (eventId) {
-            attendanceByEvent[eventId] = (attendanceByEvent[eventId] || 0) + 1;
-          }
-        });
-        const attendanceValues = Object.values(attendanceByEvent);
+        // avg attendance – from events.attendees (fallback: count subcollection)
+        const attendanceValues = eventsData
+          .map((e) => {
+            const fromDoc =
+              typeof e.attendees === 'number'
+                ? e.attendees
+                : typeof e.attendeeCount === 'number'
+                ? e.attendeeCount
+                : null;
+            if (fromDoc !== null) return fromDoc;
+
+            // fallback: count registrations for that event
+            return allRegistrations.filter((r) => r.eventId === e.id).length;
+          })
+          .filter((n) => typeof n === 'number' && !isNaN(n));
+
         const avgAttendance =
           attendanceValues.length > 0
             ? Math.round(
@@ -280,13 +264,14 @@ export default function AdminDashboard() {
               )
             : 0;
 
-        // Engagement rate: percentage of members who posted/commented/liked in last 30 days
+        // engagement rate – from posts / replies / likes as before
+
         const engagedUserIds = new Set();
         recentPosts.forEach((post) => {
           if (post.authorId) engagedUserIds.add(post.authorId);
         });
 
-        // Check replies from subcollections
+        // replies
         for (const post of postsData) {
           try {
             const repliesRef = collection(db, 'posts', post.id, 'replies');
@@ -305,12 +290,12 @@ export default function AdminDashboard() {
                 }
               }
             });
-          } catch (error) {
-            // Skip if replies don't exist
+          } catch {
+            // ignore
           }
         }
 
-        // Check likes from subcollections
+        // likes
         for (const post of postsData) {
           try {
             const likesRef = collection(db, 'posts', post.id, 'likes');
@@ -329,8 +314,8 @@ export default function AdminDashboard() {
                 }
               }
             });
-          } catch (error) {
-            // Skip if likes don't exist
+          } catch {
+            // ignore
           }
         }
 
@@ -350,22 +335,19 @@ export default function AdminDashboard() {
           engagementRate,
         });
 
-        // Process members data
+        // --- members table (events count from registrations subcollections) ---
         const processedMembers = await Promise.all(
           membersData.map(async (member) => {
             const memberId = member.uid || member.id;
 
-            // Count posts by this member
             const memberPosts = postsData.filter(
               (p) => p.authorId === memberId
             ).length;
 
-            // Count event registrations
-            const memberRegistrations = registrationsData.filter(
-              (r) => r.userId === memberId
+            const memberRegistrations = allRegistrations.filter(
+              (r) => r.userId === memberId || r.uid === memberId
             ).length;
 
-            // Determine status
             const hasRecentPost = recentPosts.some(
               (p) => p.authorId === memberId
             );
@@ -384,18 +366,12 @@ export default function AdminDashboard() {
           })
         );
 
-        console.log('Processed members:', processedMembers.length);
-        console.log('Sample processed member:', processedMembers[0]);
-
-        // Sort by join date (most recent first)
-        // Members without dates will be sorted to the end, but still included
         processedMembers.sort((a, b) => {
           const memberA = membersData.find((m) => (m.uid || m.id) === a.id);
           const memberB = membersData.find((m) => (m.uid || m.id) === b.id);
           const aDate = memberA?.createdAt || memberA?.joinedAt;
           const bDate = memberB?.createdAt || memberB?.joinedAt;
 
-          // If both have dates, sort by date (newest first)
           if (aDate && bDate) {
             const aDateObj =
               aDate instanceof Timestamp
@@ -411,53 +387,48 @@ export default function AdminDashboard() {
                 : new Date(bDate);
             return bDateObj - aDateObj;
           }
-
-          // If only one has a date, prioritize it
           if (aDate && !bDate) return -1;
           if (!aDate && bDate) return 1;
-
-          // If neither has a date, keep original order (or sort by ID)
           return 0;
         });
 
-        console.log(
-          'After sorting, first 4 members:',
-          processedMembers
-            .slice(0, 4)
-            .map((m) => ({ id: m.id, name: m.name, email: m.email }))
-        );
         setUsers(processedMembers);
 
-        // Process events data
+        // --- events list for cards (attendees from event doc) ---
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
         const processedEvents = eventsData.map((event) => {
-          // Parse the date field (could be Timestamp, Date, or string)
           const eventDate = parseEventDate(event.date);
 
-          // Calculate attendees from registrations
-          const attendees = registrationsData.filter(
-            (r) => r.eventId === event.id || r.event === event.id
-          ).length;
+          const attendeesFromDoc =
+            typeof event.attendees === 'number'
+              ? event.attendees
+              : typeof event.attendeeCount === 'number'
+              ? event.attendeeCount
+              : null;
 
-          // Format date for display using helper function
+          const attendees =
+            attendeesFromDoc !== null
+              ? attendeesFromDoc
+              : allRegistrations.filter((r) => r.eventId === event.id).length;
+
           let dateDisplay = '';
           if (eventDate) {
             dateDisplay = formatEventDate(eventDate);
-          } else if (event.date) {
-            // If it's already a string, try to use it
-            if (typeof event.date === 'string') {
-              dateDisplay = event.date.split('T')[0]; // Extract date part if ISO string
-            }
+          } else if (event.date && typeof event.date === 'string') {
+            dateDisplay = event.date.split('T')[0];
           }
 
           return {
             id: event.id,
             title: event.title || 'Untitled Event',
             date: dateDisplay,
-            originalDate: eventDate, // Keep original date object for comparison
+            originalDate: eventDate || null,
             time: event.time || '',
             location: event.location || '',
             attendees,
-            status: eventDate && eventDate >= today ? 'Scheduled' : 'Draft',
+            status: eventDate && eventDate >= today ? 'Scheduled' : 'Completed',
             category: event.category || 'Event',
             description: event.description || '',
             image: event.image || '/placeholder.svg',
@@ -469,11 +440,10 @@ export default function AdminDashboard() {
             },
             agenda: event.agenda || [],
             requirements: event.requirements || [],
-            attendeesList: [],
+            attendeesList: event.attendeesList || [],
           };
         });
 
-        // Sort events by date
         processedEvents.sort((a, b) => {
           const aDate = a.date ? new Date(a.date) : new Date(0);
           const bDate = b.date ? new Date(b.date) : new Date(0);
@@ -481,20 +451,8 @@ export default function AdminDashboard() {
         });
 
         setEvents(processedEvents);
-
-        console.log('Dashboard data loaded successfully:', {
-          members: processedMembers.length,
-          events: processedEvents.length,
-          analytics,
-        });
       } catch (error) {
         console.error('❌ Error fetching admin dashboard data:', error);
-        console.error('Error details:', {
-          message: error.message,
-          code: error.code,
-          stack: error.stack,
-        });
-        // Set empty arrays on error so UI doesn't break
         setUsers([]);
         setEvents([]);
         setAnalytics({
@@ -508,7 +466,6 @@ export default function AdminDashboard() {
           engagementRate: 0,
         });
       } finally {
-        console.log('Data fetch completed, setting loading to false');
         setLoading(false);
       }
     }
@@ -516,19 +473,20 @@ export default function AdminDashboard() {
     return () => unsubscribe();
   }, []);
 
+  // --- event form helpers ---
   const handleFormChange = (field) => (e) => {
     setForm((prev) => ({
       ...prev,
       [field]: e.target.value,
     }));
   };
+
   const startEditingEvent = (event) => {
     setEditingEventId(event.id);
-
     setForm({
       title: event.title || '',
       category: event.category || '',
-      date: event.date || '', // already in YYYY-MM-DD
+      date: event.date || '',
       time: event.time || '',
       location: event.location || '',
       spots: event.spots ? String(event.spots) : '',
@@ -551,10 +509,10 @@ export default function AdminDashboard() {
         )
         .join('\n'),
     });
-
     setActiveTab('events');
   };
-  const cancelEditingEvent = () => {
+
+  const resetForm = () => {
     setEditingEventId(null);
     setForm({
       title: '',
@@ -573,18 +531,15 @@ export default function AdminDashboard() {
       whosComingText: '',
     });
   };
+
   const handleDeleteEvent = async (eventId, title) => {
     const confirmed = window.confirm(
       `Are you sure you want to delete the event "${title}"?\nThis action cannot be undone.`
     );
-
     if (!confirmed) return;
 
     try {
-      // 🔥 Delete from Firestore
       await deleteDoc(doc(db, 'events', eventId));
-
-      // 🔄 Remove from local state so UI updates
       setEvents((prev) => prev.filter((e) => e.id !== eventId));
     } catch (error) {
       console.error('Error deleting event:', error);
@@ -635,20 +590,11 @@ export default function AdminDashboard() {
             };
           }) || [];
 
-      // Convert date string to Firestore Timestamp (UTC midnight)
       let dateTimestamp;
       if (form.date) {
         const [year, month, day] = form.date.split('-').map(Number);
         const utcDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0));
         dateTimestamp = Timestamp.fromDate(utcDate);
-
-        console.log('Creating/updating event with date:', {
-          input: form.date,
-          parsed: { year, month: month - 1, day },
-          utcDate: utcDate.toISOString(),
-          timestampDate: dateTimestamp.toDate().toISOString(),
-          formattedBack: formatEventDate(dateTimestamp.toDate()),
-        });
       } else {
         dateTimestamp = Timestamp.now();
       }
@@ -670,38 +616,33 @@ export default function AdminDashboard() {
         agenda,
         requirements,
         attendeesList: whosComing,
+        // note: attendees count is maintained by RSVP logic elsewhere
       };
 
       let eventDocRef;
 
       if (editingEventId) {
-        // 🔄 UPDATE existing event
         eventDocRef = doc(db, 'events', editingEventId);
         await updateDoc(eventDocRef, {
           ...eventPayload,
           updatedAt: Timestamp.now(),
         });
       } else {
-        // ✨ CREATE new event
         const eventsRef = collection(db, 'events');
         eventDocRef = await addDoc(eventsRef, {
           ...eventPayload,
+          attendees: 0, // new events start with 0 attendees
           createdAt: Timestamp.now(),
         });
 
-        // Create notifications for all members about the new event
+        // notify all members about new event (best-effort)
         try {
           const membersRef = collection(db, 'members');
           const membersSnapshot = await getDocs(membersRef);
-
           const notificationPromises = membersSnapshot.docs.map(
             async (memberDoc) => {
               const memberId = memberDoc.id;
-
-              // Don't create notification for the event creator (admin)
-              if (memberId === auth.currentUser?.uid) {
-                return;
-              }
+              if (memberId === auth.currentUser?.uid) return;
 
               await createNotification({
                 userId: memberId,
@@ -714,62 +655,66 @@ export default function AdminDashboard() {
               });
             }
           );
-
           await Promise.all(notificationPromises);
         } catch (error) {
           console.error('Error creating event notifications:', error);
         }
       }
 
-      // Reset form + editing state
-      setEditingEventId(null);
-      setForm({
-        title: '',
-        category: '',
-        date: '',
-        time: '',
-        location: '',
-        spots: '',
-        image: '',
-        description: '',
-        organizerName: '',
-        organizerRole: '',
-        organizerAvatar: '',
-        agendaText: '',
-        requirementsText: '',
-        whosComingText: '',
-      });
+      resetForm();
 
-      // Refresh events list (same logic you already have)
+      // re-fetch events quickly so cards stay in sync
       const eventsSnapshot = await getDocs(collection(db, 'events'));
-      const eventsData = eventsSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
+      const eventsData = eventsSnapshot.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
       }));
 
-      const registrationsSnapshot = await getDocs(
-        collection(db, 'registrations')
-      );
-      const registrationsData = registrationsSnapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      }));
+      const allRegistrations = [];
+      for (const eventDoc of eventsSnapshot.docs) {
+        try {
+          const regsRef = collection(
+            db,
+            'events',
+            eventDoc.id,
+            'registrations'
+          );
+          const regsSnap = await getDocs(regsRef);
+          regsSnap.docs.forEach((regDoc) => {
+            allRegistrations.push({
+              id: regDoc.id,
+              eventId: eventDoc.id,
+              ...regDoc.data(),
+            });
+          });
+        } catch {
+          // ignore
+        }
+      }
 
       const today = new Date();
       today.setHours(0, 0, 0, 0);
 
       const processedEvents = eventsData.map((event) => {
         const eventDate = parseEventDate(event.date);
-        const attendees = registrationsData.filter(
-          (r) => r.eventId === event.id || r.event === event.id
-        ).length;
+
+        const attendeesFromDoc =
+          typeof event.attendees === 'number'
+            ? event.attendees
+            : typeof event.attendeeCount === 'number'
+            ? event.attendeeCount
+            : null;
+
+        const attendees =
+          attendeesFromDoc !== null
+            ? attendeesFromDoc
+            : allRegistrations.filter((r) => r.eventId === event.id).length;
 
         let dateDisplay = '';
         if (eventDate) {
           dateDisplay = formatEventDate(eventDate);
-        } else if (event.date) {
-          dateDisplay =
-            typeof event.date === 'string' ? event.date.split('T')[0] : '';
+        } else if (event.date && typeof event.date === 'string') {
+          dateDisplay = event.date.split('T')[0];
         }
 
         return {
@@ -780,7 +725,7 @@ export default function AdminDashboard() {
           time: event.time || '',
           location: event.location || '',
           attendees,
-          status: eventDate && eventDate >= today ? 'Scheduled' : 'Draft',
+          status: eventDate && eventDate >= today ? 'Scheduled' : 'Completed',
           category: event.category || 'Event',
           description: event.description || '',
           image: event.image || '/placeholder.svg',
@@ -793,7 +738,6 @@ export default function AdminDashboard() {
           agenda: event.agenda || [],
           requirements: event.requirements || [],
           attendeesList: event.attendeesList || [],
-          attendeesListRaw: event.attendeesList || [],
         };
       });
 
@@ -810,9 +754,16 @@ export default function AdminDashboard() {
     }
   };
 
+  // UI below is same as previous answer, just using events.attendees everywhere
+  // (I’ll keep it as-is but now the `event.attendees` values are coming from the
+  // events collection, not from top-level registrations.)
+
+  // -------------- JSX RETURN --------------
+  // (unchanged UI structure, but now backed by updated data model)
+
   return (
     <div className="relative min-h-screen bg-background">
-      {/* Background Effects */}
+      {/* Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-1/4 -left-48 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-1/4 -right-48 w-96 h-96 bg-accent/20 rounded-full blur-3xl animate-pulse delay-1000" />
@@ -844,7 +795,7 @@ export default function AdminDashboard() {
         </div>
       </section>
 
-      {/* Main Content */}
+      {/* Main */}
       <section className="relative px-4 sm:px-6 lg:px-8 pb-20">
         <div className="max-w-7xl mx-auto">
           <Tabs
@@ -867,10 +818,11 @@ export default function AdminDashboard() {
               </TabsTrigger>
             </TabsList>
 
-            {/* Overview Tab */}
+            {/* OVERVIEW TAB */}
             <TabsContent value="overview" className="space-y-8">
-              {/* Analytics Cards */}
+              {/* Analytics cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                {/* Total Members */}
                 <Card className="p-6 bg-card/50 backdrop-blur-xl border-border hover:border-primary/50 transition-all">
                   <div className="flex items-center justify-between mb-4">
                     <div className="p-3 rounded-xl bg-primary/10">
@@ -896,6 +848,7 @@ export default function AdminDashboard() {
                   </div>
                 </Card>
 
+                {/* Events */}
                 <Card className="p-6 bg-card/50 backdrop-blur-xl border-border hover:border-accent/50 transition-all">
                   <div className="flex items-center justify-between mb-4">
                     <div className="p-3 rounded-xl bg-accent/10">
@@ -919,6 +872,7 @@ export default function AdminDashboard() {
                   </div>
                 </Card>
 
+                {/* Avg attendance */}
                 <Card className="p-6 bg-card/50 backdrop-blur-xl border-border hover:border-secondary/50 transition-all">
                   <div className="flex items-center justify-between mb-4">
                     <div className="p-3 rounded-xl bg-secondary/10">
@@ -939,6 +893,7 @@ export default function AdminDashboard() {
                   <div className="mt-2 text-xs text-secondary">per event</div>
                 </Card>
 
+                {/* Engagement */}
                 <Card className="p-6 bg-card/50 backdrop-blur-xl border-border hover:border-primary/50 transition-all">
                   <div className="flex items-center justify-between mb-4">
                     <div className="p-3 rounded-xl bg-primary/10">
@@ -964,8 +919,9 @@ export default function AdminDashboard() {
                 </Card>
               </div>
 
-              {/* Recent Activity */}
+              {/* Recent members & upcoming events */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Recent Members */}
                 <Card className="p-6 bg-card/50 backdrop-blur-xl border-border">
                   <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
                     <Users className="h-5 w-5 text-primary" />
@@ -1017,6 +973,7 @@ export default function AdminDashboard() {
                   )}
                 </Card>
 
+                {/* Upcoming Events */}
                 <Card className="p-6 bg-card/50 backdrop-blur-xl border-border">
                   <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
                     <Calendar className="h-5 w-5 text-accent" />
@@ -1027,78 +984,72 @@ export default function AdminDashboard() {
                       <Loader2 className="h-6 w-6 animate-spin text-accent" />
                     </div>
                   ) : (
-                    <>
-                      {(() => {
-                        const now = new Date(); // Current datetime
-                        const upcoming = events
-                          .filter((event) => {
-                            if (!event.originalDate) {
-                              // If no originalDate, try to parse from date string
-                              if (!event.date) return false;
-                              try {
-                                const eventDate = new Date(event.date);
-                                return (
-                                  !isNaN(eventDate.getTime()) &&
-                                  eventDate >= now
-                                );
-                              } catch (e) {
-                                return false;
-                              }
-                            }
-                            // Compare using original date object (preserves time)
-                            return event.originalDate >= now;
-                          })
-                          .sort((a, b) => {
-                            const aDate =
-                              a.originalDate ||
-                              (a.date ? new Date(a.date) : null);
-                            const bDate =
-                              b.originalDate ||
-                              (b.date ? new Date(b.date) : null);
-                            if (!aDate || !bDate) return 0;
-                            return aDate - bDate; // Soonest first
-                          })
-                          .slice(0, 3);
-                        return upcoming.length === 0 ? (
+                    (() => {
+                      const now = new Date();
+                      const upcoming = events
+                        .filter((event) => {
+                          if (!event.originalDate) {
+                            if (!event.date) return false;
+                            const d = new Date(event.date);
+                            return !isNaN(d.getTime()) && d >= now;
+                          }
+                          return event.originalDate >= now;
+                        })
+                        .sort((a, b) => {
+                          const aDate =
+                            a.originalDate ||
+                            (a.date ? new Date(a.date) : null);
+                          const bDate =
+                            b.originalDate ||
+                            (b.date ? new Date(b.date) : null);
+                          if (!aDate || !bDate) return 0;
+                          return aDate - bDate;
+                        })
+                        .slice(0, 3);
+
+                      if (upcoming.length === 0) {
+                        return (
                           <div className="text-center py-8 text-muted-foreground">
                             No upcoming events
                           </div>
-                        ) : (
-                          <div className="space-y-4">
-                            {upcoming.map((event) => (
-                              <div
-                                key={event.id}
-                                className="flex items-center justify-between p-3 rounded-lg bg-background/50 hover:bg-background transition-colors"
-                              >
-                                <div>
-                                  <div className="font-medium mb-1">
-                                    {event.title}
-                                  </div>
-                                  <div className="text-xs text-foreground/60 flex items-center gap-3">
-                                    <span>{event.date}</span>
-                                    {event.time && (
-                                      <>
-                                        <span>•</span>
-                                        <span>{event.time}</span>
-                                      </>
-                                    )}
-                                  </div>
-                                </div>
-                                <Badge variant="secondary">
-                                  {event.attendees} RSVPs
-                                </Badge>
-                              </div>
-                            ))}
-                          </div>
                         );
-                      })()}
-                    </>
+                      }
+
+                      return (
+                        <div className="space-y-4">
+                          {upcoming.map((event) => (
+                            <div
+                              key={event.id}
+                              className="flex items-center justify-between p-3 rounded-lg bg-background/50 hover:bg-background transition-colors"
+                            >
+                              <div>
+                                <div className="font-medium mb-1">
+                                  {event.title}
+                                </div>
+                                <div className="text-xs text-foreground/60 flex items-center gap-3">
+                                  <span>{event.date}</span>
+                                  {event.time && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{event.time}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
+                              <Badge variant="secondary">
+                                {event.attendees} RSVPs
+                              </Badge>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()
                   )}
                 </Card>
               </div>
             </TabsContent>
 
-            {/* Users Tab */}
+            {/* USERS TAB */}
             <TabsContent value="users" className="space-y-6">
               <Card className="p-6 bg-card/50 backdrop-blur-xl border-border">
                 <div className="flex flex-col md:flex-row gap-4">
@@ -1280,13 +1231,13 @@ export default function AdminDashboard() {
               </Card>
             </TabsContent>
 
-            {/* Events Tab */}
+            {/* EVENTS TAB */}
             <TabsContent value="events" className="space-y-6">
-              {/* Event Creation */}
+              {/* Event form */}
               <Card className="p-6 bg-card/50 backdrop-blur-xl border-border">
                 <h3 className="text-xl font-bold mb-4 flex items-center gap-2">
                   <Calendar className="h-5 w-5 text-primary" />
-                  Create New Event
+                  {editingEventId ? 'Edit Event' : 'Create New Event'}
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="md:col-span-2">
@@ -1387,7 +1338,7 @@ export default function AdminDashboard() {
                     />
                   </div>
 
-                  {/* Organizer Info */}
+                  {/* Organizer info */}
                   <div className="md:col-span-2 pt-2 border-t border-border/60">
                     <h4 className="text-sm font-semibold mb-2">
                       Organizer Details
@@ -1439,8 +1390,8 @@ export default function AdminDashboard() {
                       format. Example:
                     </p>
                     <pre className="text-xs font-mono bg-background/60 border border-dashed border-border rounded-md p-2 mb-2">
-                      6:00 PM | Welcome & Introduction | 15 min 6:15 PM |
-                      Quantum Basics Overview | 30 min
+                      {`6:00 PM | Welcome & Introduction | 15 min
+6:15 PM | Quantum Basics Overview | 30 min`}
                     </pre>
                     <textarea
                       placeholder="6:00 PM | Welcome & Introduction | 15 min"
@@ -1468,7 +1419,8 @@ export default function AdminDashboard() {
                       onChange={handleFormChange('requirementsText')}
                     />
                   </div>
-                  {/* Who's Coming */}
+
+                  {/* Who's coming */}
                   <div className="md:col-span-2">
                     <h4 className="text-sm font-semibold mb-2">
                       Who&apos;s Coming
@@ -1479,9 +1431,8 @@ export default function AdminDashboard() {
                       format. Example:
                     </p>
                     <pre className="text-xs font-mono bg-background/60 border border-dashed border-border rounded-md p-2 mb-2">
-                      Abdallah Aisharrah | Founder & President |
-                      /professional-man.jpg Jane Doe | VP, Events |
-                      /team-member-2.jpg
+                      {`Abdallah Aisharrah | Founder & President | /professional-man.jpg
+Jane Doe | VP, Events | /team-member-2.jpg`}
                     </pre>
                     <textarea
                       placeholder="Abdallah Aisharrah | Founder & President | /professional-man.jpg"
@@ -1492,45 +1443,22 @@ export default function AdminDashboard() {
                     />
                   </div>
 
+                  {/* Form actions */}
                   <div className="md:col-span-2 flex gap-3 pt-2">
-                    <div className="md:col-span-2 flex gap-3 pt-2">
-                      <Button
-                        className="bg-primary hover:bg-primary/90 text-primary-foreground"
-                        onClick={handleCreateEvent}
-                      >
-                        {editingEventId ? 'Update Event' : 'Create Event'}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        type="button"
-                        onClick={() => {
-                          setEditingEventId(null); // ✅ reset editing if any
-                          setForm({
-                            title: '',
-                            category: '',
-                            date: '',
-                            time: '',
-                            location: '',
-                            spots: '',
-                            image: '',
-                            description: '',
-                            organizerName: '',
-                            organizerRole: '',
-                            organizerAvatar: '',
-                            agendaText: '',
-                            requirementsText: '',
-                            whosComingText: '',
-                          });
-                        }}
-                      >
-                        {editingEventId ? 'Cancel Edit' : 'Clear Form'}
-                      </Button>
-                    </div>
+                    <Button
+                      className="bg-primary hover:bg-primary/90 text-primary-foreground"
+                      onClick={handleCreateEvent}
+                    >
+                      {editingEventId ? 'Update Event' : 'Create Event'}
+                    </Button>
+                    <Button variant="outline" type="button" onClick={resetForm}>
+                      {editingEventId ? 'Cancel Edit' : 'Clear Form'}
+                    </Button>
                   </div>
                 </div>
               </Card>
 
-              {/* Events List */}
+              {/* Events list */}
               <Card className="p-6 bg-card/50 backdrop-blur-xl border-border">
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-xl font-bold">Scheduled Events</h3>
@@ -1598,7 +1526,8 @@ export default function AdminDashboard() {
                               </span>
                             </div>
                           </div>
-                          <div className="flex gap-2">
+                          <div className="flex flex-wrap gap-2">
+                            {/* Public event detail */}
                             <Link href={`/member/events/${event.id}`}>
                               <Button
                                 size="sm"
@@ -1609,11 +1538,24 @@ export default function AdminDashboard() {
                                 View
                               </Button>
                             </Link>
+
+                            {/* Admin registrations page */}
+                            <Link href={`/admin/events/${event.id}`}>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="gap-2 bg-transparent"
+                              >
+                                <Users className="h-4 w-4" />
+                                Registrations
+                              </Button>
+                            </Link>
+
                             <Button
                               size="sm"
                               variant="outline"
                               className="gap-2 bg-transparent"
-                              onClick={() => startEditingEvent(event)} // ✅ NEW
+                              onClick={() => startEditingEvent(event)}
                             >
                               <Edit className="h-4 w-4" />
                               Edit
