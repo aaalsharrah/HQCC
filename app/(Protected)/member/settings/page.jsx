@@ -45,14 +45,12 @@ export default function SettingsPage() {
   const [savingNotifications, setSavingNotifications] = useState(false);
   const [savingAppearance, setSavingAppearance] = useState(false);
 
-  // Minimal profile info for account tab
   const [profile, setProfile] = useState(null);
 
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // Preferences (only things we actually show in UI)
   const [privacy, setPrivacy] = useState({
     showEmail: false,
   });
@@ -64,21 +62,20 @@ export default function SettingsPage() {
     eventReminders: true,
   });
 
-  // 🧑‍💼 Board role (President / VP / Secretary / Treasurer)
-  const [boardRole, setBoardRole] = useState(''); // '', 'president', 'vice_president', 'secretary', 'treasurer'
-
-  // 🔐 Admin flag (derived from Firestore `role` field)
+  // 🧑‍💼 Board role (President / VP / Secretary / Treasurer / Advisor)
+  const [boardRole, setBoardRole] = useState('');
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // 🌗 Theme context (global, single source of truth)
+  // map: { president: { uid, name }, ... }
+  const [takenRoles, setTakenRoles] = useState({});
+
+  // 🌗 Theme context
   const { appearance, updateAppearance } = useTheme();
 
   const handleAppearanceChange = (patch) => {
-    // patch-style: { theme: 'dark' }, { fontSize: 'large' }, { colorScheme: 'nebula' }
     updateAppearance(patch);
   };
 
-  // Helper to prettify role name for alerts
   const prettyRole = (value) => {
     switch (value) {
       case 'president':
@@ -89,8 +86,34 @@ export default function SettingsPage() {
         return 'Secretary';
       case 'treasurer':
         return 'Treasurer';
+      case 'advisor':
+        return 'Advisor';
       default:
         return 'Board Member';
+    }
+  };
+
+  // 🔁 Load map of which board roles are currently taken
+  const loadBoardRoleAssignments = async (currentUid) => {
+    try {
+      const membersRef = collection(db, 'members');
+      const snap = await getDocs(membersRef);
+
+      const roles = {};
+      snap.docs.forEach((docSnap) => {
+        const data = docSnap.data();
+        const r = data.boardRole;
+        if (r && typeof r === 'string' && r.trim() !== '') {
+          roles[r] = {
+            uid: docSnap.id,
+            name: data.name || 'Member',
+          };
+        }
+      });
+
+      setTakenRoles(roles);
+    } catch (err) {
+      console.error('Error loading board role assignments:', err);
     }
   };
 
@@ -128,10 +151,8 @@ export default function SettingsPage() {
             avatar: user.photoURL || '/quantum-computing-student.jpg',
             createdAt: serverTimestamp(),
 
-            // 🔑 your existing role field
-            role: 'member', // 'member' | 'admin'
+            role: 'member',
 
-            // only the fields we care about now
             privacy: {
               showEmail: false,
             },
@@ -142,7 +163,6 @@ export default function SettingsPage() {
               eventReminders: true,
             },
 
-            // Board role starts empty
             boardRole: '',
 
             appearance: {
@@ -162,9 +182,8 @@ export default function SettingsPage() {
           setPrivacy(defaultData.privacy);
           setNotifications(defaultData.notifications);
           setBoardRole(defaultData.boardRole || '');
-          setIsAdmin(defaultData.role === 'admin'); // false for new members
+          setIsAdmin(defaultData.role === 'admin');
 
-          // sync ThemeContext to this default appearance
           updateAppearance(defaultData.appearance);
         } else {
           const data = snap.data();
@@ -177,7 +196,6 @@ export default function SettingsPage() {
 
           setProfile(loadedProfile);
 
-          // Safely load only the fields we support now
           setPrivacy({
             showEmail: data.privacy?.showEmail ?? false,
           });
@@ -190,9 +208,8 @@ export default function SettingsPage() {
           });
 
           setBoardRole(data.boardRole || '');
-
-          // 🔐 derive admin status from `role` field
-          setIsAdmin(data.role === 'admin');
+          const admin = data.role === 'admin';
+          setIsAdmin(admin);
 
           const loadedAppearance = {
             theme: data.appearance?.theme || 'dark',
@@ -200,8 +217,12 @@ export default function SettingsPage() {
             colorScheme: data.appearance?.colorScheme || 'quantum',
           };
 
-          // sync ThemeContext so whole app matches profile
           updateAppearance(loadedAppearance);
+
+          // If this user is admin, load the taken board roles for the dropdown
+          if (admin) {
+            await loadBoardRoleAssignments(user.uid);
+          }
         }
       } catch (err) {
         console.error('Error loading settings:', err);
@@ -211,8 +232,7 @@ export default function SettingsPage() {
     });
 
     return () => unsub();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [router]);
+  }, [router, updateAppearance]);
 
   // ✅ Update email
   const handleUpdateEmail = async () => {
@@ -225,7 +245,6 @@ export default function SettingsPage() {
 
     setSavingAccount(true);
     try {
-      // Reauthenticate
       const cred = EmailAuthProvider.credential(
         currentUser.email,
         currentPassword
@@ -285,7 +304,7 @@ export default function SettingsPage() {
     }
   };
 
-  // ✅ Save privacy + (if admin) board role to Firestore
+  // ✅ Save privacy + board role
   const handleSavePrivacy = async () => {
     if (!currentUser) return;
     setSavingPrivacy(true);
@@ -293,7 +312,7 @@ export default function SettingsPage() {
     try {
       let boardRoleToSave = boardRole;
 
-      // 🛡 Only admins can claim / change board roles
+      // 🔐 still enforce uniqueness at save-time
       if (isAdmin && boardRole) {
         const membersRef = collection(db, 'members');
         const q = query(membersRef, where('boardRole', '==', boardRole));
@@ -309,13 +328,14 @@ export default function SettingsPage() {
             `${label} role is already taken by another member. Please choose a different role.`
           );
           setSavingPrivacy(false);
+          // Reload taken roles to sync UI
+          await loadBoardRoleAssignments(currentUser.uid);
           return;
         }
       }
 
-      // If user is not admin, never let them change boardRole
       if (!isAdmin) {
-        boardRoleToSave = undefined; // don't touch this field at all
+        boardRoleToSave = undefined; // don't touch boardRole in Firestore
       }
 
       const ref = doc(db, 'members', currentUser.uid);
@@ -331,6 +351,11 @@ export default function SettingsPage() {
 
       await updateDoc(ref, updatePayload);
 
+      // Refresh taken roles map so other admins see that this role is now taken
+      if (isAdmin) {
+        await loadBoardRoleAssignments(currentUser.uid);
+      }
+
       alert('Privacy settings updated.');
     } catch (err) {
       console.error('Error saving privacy/role:', err);
@@ -340,7 +365,7 @@ export default function SettingsPage() {
     }
   };
 
-  // ✅ Save notifications to Firestore
+  // ✅ Save notifications
   const handleSaveNotifications = async () => {
     if (!currentUser) return;
     setSavingNotifications(true);
@@ -357,7 +382,7 @@ export default function SettingsPage() {
     }
   };
 
-  // ✅ Save appearance to Firestore (ThemeContext already applied live)
+  // ✅ Save appearance
   const handleSaveAppearance = async () => {
     if (!currentUser) return;
     setSavingAppearance(true);
@@ -382,6 +407,14 @@ export default function SettingsPage() {
     );
   }
 
+  // helper to check if a role is taken by someone else
+  const roleTakenByOther = (roleKey) => {
+    const info = takenRoles[roleKey];
+    if (!info) return false;
+    if (!currentUser) return true;
+    return info.uid !== currentUser.uid;
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Background effects */}
@@ -405,28 +438,28 @@ export default function SettingsPage() {
           <TabsList className="w-full bg-card/50 backdrop-blur-xl border border-border/50 p-1 grid grid-cols-2 md:grid-cols-4 gap-1">
             <TabsTrigger
               value="account"
-              className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary flex items-center gap-2"
+              className="tab-trigger data-[state=active]:bg-primary/20 data-[state=active]:text-primary flex items-center gap-2"
             >
               <Lock className="h-4 w-4" />
               <span className="hidden sm:inline">Account</span>
             </TabsTrigger>
             <TabsTrigger
               value="privacy"
-              className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary flex items-center gap-2"
+              className="tab-trigger data-[state=active]:bg-primary/20 data-[state=active]:text-primary flex items-center gap-2"
             >
               <Shield className="h-4 w-4" />
               <span className="hidden sm:inline">Privacy</span>
             </TabsTrigger>
             <TabsTrigger
               value="notifications"
-              className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary flex items-center gap-2"
+              className="tab-trigger data-[state=active]:bg-primary/20 data-[state=active]:text-primary flex items-center gap-2"
             >
               <Bell className="h-4 w-4" />
               <span className="hidden sm:inline">Notifications</span>
             </TabsTrigger>
             <TabsTrigger
               value="appearance"
-              className="data-[state=active]:bg-primary/20 data-[state=active]:text-primary flex items-center gap-2"
+              className="tab-trigger data-[state=active]:bg-primary/20 data-[state=active]:text-primary flex items-center gap-2"
             >
               <Palette className="h-4 w-4" />
               <span className="hidden sm:inline">Appearance</span>
@@ -550,7 +583,6 @@ export default function SettingsPage() {
               </h2>
 
               <div className="space-y-6">
-                {/* Show Email ONLY */}
                 <div className="flex items-center justify-between py-4">
                   <div className="space-y-1">
                     <Label
@@ -582,11 +614,11 @@ export default function SettingsPage() {
                       htmlFor="board-role"
                       className="text-base font-medium"
                     >
-                      Board Role (Admin / Board Members)
+                      Board Role (Admin / Board / Advisor)
                     </Label>
                     <p className="text-sm text-muted-foreground">
-                      Assign yourself a club board position. Each role can only
-                      be claimed by one member at a time.
+                      Assign yourself a club board position. Each role (including
+                      Advisor) can only be claimed by one member at a time.
                     </p>
                     <select
                       id="board-role"
@@ -595,10 +627,71 @@ export default function SettingsPage() {
                       className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     >
                       <option value="">None</option>
-                      <option value="president">President</option>
-                      <option value="vice_president">Vice President</option>
-                      <option value="secretary">Secretary</option>
-                      <option value="treasurer">Treasurer</option>
+
+                      <option
+                        value="president"
+                        disabled={roleTakenByOther('president')}
+                        className={
+                          roleTakenByOther('president')
+                            ? 'text-muted-foreground'
+                            : ''
+                        }
+                      >
+                        President
+                        {roleTakenByOther('president') ? ' (taken)' : ''}
+                      </option>
+
+                      <option
+                        value="vice_president"
+                        disabled={roleTakenByOther('vice_president')}
+                        className={
+                          roleTakenByOther('vice_president')
+                            ? 'text-muted-foreground'
+                            : ''
+                        }
+                      >
+                        Vice President
+                        {roleTakenByOther('vice_president') ? ' (taken)' : ''}
+                      </option>
+
+                      <option
+                        value="secretary"
+                        disabled={roleTakenByOther('secretary')}
+                        className={
+                          roleTakenByOther('secretary')
+                            ? 'text-muted-foreground'
+                            : ''
+                        }
+                      >
+                        Secretary
+                        {roleTakenByOther('secretary') ? ' (taken)' : ''}
+                      </option>
+
+                      <option
+                        value="treasurer"
+                        disabled={roleTakenByOther('treasurer')}
+                        className={
+                          roleTakenByOther('treasurer')
+                            ? 'text-muted-foreground'
+                            : ''
+                        }
+                      >
+                        Treasurer
+                        {roleTakenByOther('treasurer') ? ' (taken)' : ''}
+                      </option>
+
+                      <option
+                        value="advisor"
+                        disabled={roleTakenByOther('advisor')}
+                        className={
+                          roleTakenByOther('advisor')
+                            ? 'text-muted-foreground'
+                            : ''
+                        }
+                      >
+                        Advisor
+                        {roleTakenByOther('advisor') ? ' (taken)' : ''}
+                      </option>
                     </select>
                   </div>
                 )}
@@ -630,7 +723,6 @@ export default function SettingsPage() {
                     General
                   </h3>
 
-                  {/* Email Notifications ONLY */}
                   <div className="flex items-center justify-between py-3">
                     <div className="space-y-1">
                       <Label
@@ -834,7 +926,7 @@ export default function SettingsPage() {
                 {/* Color scheme */}
                 <div className="space-y-2">
                   <Label>Color Scheme</Label>
-                  <div className="grid grid-cols-3 gap-4">
+                  <div className="grid grid-cols-4 gap-4">
                     <button
                       onClick={() =>
                         handleAppearanceChange({ colorScheme: 'quantum' })
@@ -873,6 +965,21 @@ export default function SettingsPage() {
                     >
                       <div className="w-full h-20 rounded bg-linear-to-br from-green-500 to-teal-600 mb-2" />
                       <p className="text-sm font-medium">Aurora</p>
+                    </button>
+
+                    {/* Hofstra theme */}
+                    <button
+                      onClick={() =>
+                        handleAppearanceChange({ colorScheme: 'hofstra' })
+                      }
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        appearance.colorScheme === 'hofstra'
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border/50 hover:border-primary/50'
+                      }`}
+                    >
+                      <div className="w-full h-20 rounded bg-gradient-to-br from-[#003588] via-[#ffbf00] to-[#fbbf24] mb-2" />
+                      <p className="text-sm font-medium">Hofstra</p>
                     </button>
                   </div>
                 </div>

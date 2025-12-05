@@ -4,67 +4,87 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ─────────────────────────────────────
+   GLOBAL FONT SIZE SCALE
+   ───────────────────────────────────── */
+
+/* Base size */
+:root {
+  font-size: 16px; /* Tailwind default */
+}
+
+/* Smaller text */
+:root[data-font-size='small'] {
+  font-size: 14px;
+}
+
+/* Medium (default) */
+:root[data-font-size='medium'] {
+  font-size: 16px;
+}
+
+/* Larger text */
+:root[data-font-size='large'] {
+  font-size: 18px;
+}
+
+/* ─────────────────────────────────────
    THEME TOKENS – LIGHT / DARK
    ───────────────────────────────────── */
 
-/* Light theme (default) */
+/* LIGHT THEME – slate / silver / teal */
 :root,
 :root[data-theme='light'] {
-  /* Slightly warm, soft background instead of pure white */
-  --background: oklch(0.96 0.015 255);
+  --background: oklch(0.97 0.01 240);
   --foreground: oklch(0.22 0.03 255);
 
-  /* Cards just a bit darker than background for separation */
-  --card: oklch(0.94 0.012 255);
+  --card: oklch(0.94 0.015 240);
   --card-foreground: var(--foreground);
 
-  /* Popovers a hair brighter */
-  --popover: oklch(0.97 0.01 255);
+  --popover: oklch(0.985 0.008 240);
   --popover-foreground: var(--foreground);
 
-  /* Softer primaries for light mode (quantum / nebula / aurora will still override via data-color-scheme) */
-  --primary: oklch(0.72 0.18 210);
+  --primary: oklch(0.78 0.18 195); /* teal */
   --primary-foreground: oklch(0.16 0.03 255);
 
-  --secondary: oklch(0.9 0.04 255);
+  --secondary: oklch(0.93 0.02 240);
   --secondary-foreground: var(--foreground);
 
-  /* Muted surfaces + text for subtle sections */
-  --muted: oklch(0.93 0.01 255);
-  --muted-foreground: oklch(0.5 0.03 255);
+  --muted: oklch(0.93 0.01 240);
+  --muted-foreground: oklch(0.52 0.03 255);
 
-  --accent: oklch(0.78 0.18 210);
+  --accent: oklch(0.8 0.2 210);
   --accent-foreground: var(--primary-foreground);
 
   --destructive: oklch(0.65 0.18 27);
   --destructive-foreground: oklch(0.98 0.01 255);
 
-  /* Stronger border so components feel defined, but not harsh */
-  --border: oklch(0.86 0.01 255 / 0.4);
-  --input: oklch(0.9 0.01 255);
+  --border: oklch(0.86 0.015 240 / 0.6);
+  --input: oklch(0.93 0.01 240);
   --ring: var(--primary);
 
-  /* Charts still colorful but not neon */
-  --chart-1: oklch(0.7 0.18 40);
-  --chart-2: oklch(0.67 0.13 210);
-  --chart-3: oklch(0.6 0.1 260);
-  --chart-4: oklch(0.78 0.16 120);
-  --chart-5: oklch(0.75 0.16 340);
+  --chart-1: oklch(0.7 0.18 210);
+  --chart-2: oklch(0.65 0.14 250);
+  --chart-3: oklch(0.64 0.14 160);
+  --chart-4: oklch(0.72 0.12 280);
+  --chart-5: oklch(0.72 0.16 20);
 
   --radius: 0.75rem;
 
-  /* Sidebar slightly tinted, not full white */
-  --sidebar: oklch(0.95 0.01 255);
+  --sidebar: oklch(0.96 0.01 240);
   --sidebar-foreground: var(--foreground);
-  --sidebar-primary: oklch(0.78 0.18 210);
+  --sidebar-primary: var(--primary);
   --sidebar-primary-foreground: var(--primary-foreground);
-  --sidebar-accent: oklch(0.92 0.01 255);
+  --sidebar-accent: oklch(0.94 0.01 240);
   --sidebar-accent-foreground: var(--foreground);
-  --sidebar-border: oklch(0.88 0.01 255);
+  --sidebar-border: oklch(0.9 0.01 240);
   --sidebar-ring: var(--sidebar-primary);
+
+  /* Particles */
+  --particle-strong: oklch(0.78 0.02 240);
+  --particle-soft: oklch(0.86 0.015 240);
 }
 
-/* Dark theme – triggered by .dark class OR data-theme="dark" */
+/* DARK THEME */
 :root.dark,
 :root[data-theme='dark'],
 .dark {
@@ -113,44 +133,90 @@
 }
 
 /* ─────────────────────────────────────
-   FONT SIZE – driven by data-font-size
+   COLOR SCHEMES
    ───────────────────────────────────── */
 
-:root[data-font-size='small'] {
-  font-size: 14px;
-}
-
-:root[data-font-size='medium'] {
-  font-size: 16px; /* default */
-}
-
-:root[data-font-size='large'] {
-  font-size: 18px;
-}
-
-/* ─────────────────────────────────────
-   COLOR SCHEMES – driven by data-color-scheme
-   ───────────────────────────────────── */
-
-/* Quantum: cyan / blue */
 :root[data-color-scheme='quantum'] {
   --primary: oklch(0.68 0.24 192);
   --accent: oklch(0.72 0.26 192);
   --secondary: oklch(0.58 0.2 258);
 }
 
-/* Nebula: purple / pink */
 :root[data-color-scheme='nebula'] {
   --primary: oklch(0.72 0.25 300);
   --accent: oklch(0.75 0.25 330);
   --secondary: oklch(0.6 0.2 280);
 }
 
-/* Aurora: green / teal */
 :root[data-color-scheme='aurora'] {
   --primary: oklch(0.7 0.22 150);
   --accent: oklch(0.72 0.22 180);
   --secondary: oklch(0.6 0.18 160);
+}
+
+/* =========================================================================
+   HOFSTRA THEME – DARK NAVY + GOLD
+   ========================================================================= */
+:root[data-color-scheme='hofstra'] {
+  --primary: #2563eb; /* bright Hofstra blue */
+  --primary-foreground: #f9fafb;
+
+  --accent: #ffbf00; /* rich gold */
+  --accent-foreground: #111827;
+
+  --secondary: #003588; /* royal blue */
+  --secondary-foreground: #e5e7eb;
+
+  --background: #050810; /* deep navy */
+  --foreground: #dce4ff;
+
+  --card: #0b1220;
+  --card-foreground: var(--foreground);
+
+  --popover: #0b1220;
+  --popover-foreground: var(--foreground);
+
+  --border: rgba(255, 191, 0, 0.35);
+  --input: #0f172a;
+  --ring: var(--accent);
+
+  --muted: #0f172a;
+  --muted-foreground: #9ca3af;
+
+  --chart-1: #2563eb;
+  --chart-2: #ffbf00;
+  --chart-3: #38bdf8;
+  --chart-4: #4f46e5;
+  --chart-5: #fbbf24;
+
+  --sidebar: #020617;
+  --sidebar-foreground: #e5e9ff;
+  --sidebar-primary: #ffbf00;
+  --sidebar-primary-foreground: #111827;
+  --sidebar-accent: #2563eb;
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgba(255, 191, 0, 0.25);
+  --sidebar-ring: #ffbf00;
+}
+
+/* =========================================================================
+   HOFSTRA ACTIVE TABS (requires .tab-trigger class)
+   ========================================================================= */
+:root[data-color-scheme='hofstra'] .tab-trigger[data-state='active'] {
+  background-color: color-mix(in srgb, var(--accent) 20%, transparent);
+  color: var(--accent) !important;
+  border-color: var(--accent) !important;
+}
+
+/* =========================================================================
+   HOFSTRA CUSTOM BACKGROUND OVERRIDE
+   ========================================================================= */
+:root[data-color-scheme='hofstra'] body {
+  background:
+    radial-gradient(circle at top left, rgba(37, 99, 235, 0.25), transparent 55%),
+    radial-gradient(circle at bottom right, rgba(255, 191, 0, 0.22), transparent 55%),
+    linear-gradient(180deg, #050810 0%, #020617 100%);
+  background-attachment: fixed;
 }
 
 /* ─────────────────────────────────────
@@ -158,7 +224,6 @@
    ───────────────────────────────────── */
 
 @theme inline {
-  /* optional: --font-sans, --font-serif, --font-mono if they are applied in the layout.tsx */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -217,18 +282,38 @@
 
   body {
     @apply bg-background text-foreground antialiased;
+
+    /* Light theme gradient (auto removed in Hofstra via override) */
+    background:
+      radial-gradient(
+        circle at top left,
+        oklch(0.9 0.05 210 / 0.45),
+        transparent 55%
+      ),
+      radial-gradient(
+        circle at bottom right,
+        oklch(0.9 0.04 260 / 0.4),
+        transparent 55%
+      ),
+      linear-gradient(
+        180deg,
+        oklch(0.985 0.008 240) 0%,
+        oklch(0.965 0.012 240) 40%,
+        oklch(0.97 0.01 240) 100%
+      );
+    background-attachment: fixed;
   }
 }
 
 /* ─────────────────────────────────────
-   UTILITIES – animations
+   UTILITIES + ANIMATIONS
    ───────────────────────────────────── */
 
 @layer utilities {
   @keyframes float-gentle {
     0%,
     100% {
-      transform: translateY(0px);
+      transform: translateY(0);
     }
     50% {
       transform: translateY(-20px);
@@ -269,17 +354,35 @@
   .animate-float-gentle {
     animation: float-gentle 8s ease-in-out infinite;
   }
-
   .animate-rotate-slow {
     animation: rotate-slow 20s linear infinite;
   }
-
   .animate-glow-pulse {
     animation: glow-pulse 4s ease-in-out infinite;
   }
-
   .animate-gradient {
     background-size: 200% 200%;
     animation: gradient-shift 8s ease infinite;
+  }
+}
+
+/* =========================================================================
+   HOFSTRA — GOLD HOVER EFFECTS
+   ========================================================================= */
+@layer utilities {
+  .hofstra-hover-gold:hover {
+    box-shadow: 0 0 18px rgba(255, 191, 0, 0.45);
+    transform: translateY(-1px);
+    transition: box-shadow 0.25s ease, transform 0.2s ease;
+  }
+
+  .hofstra-gold-border:hover {
+    border-color: var(--accent) !important;
+    transition: border-color 0.2s ease;
+  }
+
+  .hofstra-gold-text:hover {
+    color: var(--accent) !important;
+    transition: color 0.2s ease;
   }
 }

@@ -6,7 +6,7 @@ import * as THREE from "three";
 
 // ---- Generate particle data ONCE, outside React ----
 
-const PARTICLE_COUNT = 2000;
+const PARTICLE_COUNT = 5000;
 
 function createParticleData() {
   const positions = new Float32Array(PARTICLE_COUNT * 3);
@@ -87,9 +87,9 @@ function QuantumSphere() {
         color="#00d9ff"
         wireframe
         emissive="#00d9ff"
-        emissiveIntensity={0.5}
+        emissiveIntensity={1.5}
         transparent
-        opacity={0.3}
+        opacity={0.5}
       />
     </mesh>
   );
