@@ -1,0 +1,69 @@
+# Settings for Backend (on Cloud Run).
+# See https://firebase.google.com/docs/app-hosting/configure#cloud-run
+runConfig:
+  minInstances: 0
+  # maxInstances: 100
+  # concurrency: 80
+  # cpu: 1
+  # memoryMiB: 512
+
+# Environment variables and secrets.
+env:
+  # 🔥 PUBLIC FIREBASE CONFIG (safe to expose, just like in .env.local)
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: 'AIzaSyAYlZriET5OuHbuZMZiiMMckSW1GyzTkIc'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: 'hqcc-141ca.firebaseapp.com'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: 'hqcc-141ca'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: 'hqcc-141ca.firebasestorage.app'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: '87707899718'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: '1:87707899718:web:0a5989c1bfc3c8a5c73747'
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
+    value: 'G-43JZ8SE4SS'
+    availability:
+      - BUILD
+      - RUNTIME
+
+  # 👇 Add more if you use them in server code:
+  # - variable: STRIPE_SECRET_KEY
+  #   value: "sk_live_..."
+  #   availability:
+  #     - RUNTIME
+
+  # - variable: FIREBASE_CLIENT_EMAIL
+  #   value: "..."
+  #   availability:
+  #     - BUILD
+  #     - RUNTIME
+
+  # - variable: FIREBASE_PRIVATE_KEY
+  #   value: "-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+  #   availability:
+  #     - RUNTIME
