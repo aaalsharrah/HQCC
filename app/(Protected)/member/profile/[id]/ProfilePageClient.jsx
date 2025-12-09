@@ -36,6 +36,7 @@ import {
   orderBy,
   getDocs,
   setDoc,
+  collectionGroup, // ✅ NEW: for querying replies
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { findOrCreateConversation } from '@/app/lib/firebase/messages';
@@ -97,11 +98,14 @@ export default function ProfilePageClient({ profileId }) {
   const [error, setError] = useState(null);
 
   const [activeTab, setActiveTab] = useState('posts'); // which tab is active
+
   const [likedPostsLoaded, setLikedPostsLoaded] = useState(false); // lazy load flag
+  const [replies, setReplies] = useState([]); // ✅ replies state
+  const [repliesLoaded, setRepliesLoaded] = useState(false); // ✅ lazy load flag for replies
 
   const mediaPosts = posts.filter((p) => p.image);
 
-  // MAIN LOAD: auth + profile + posts (NOT liked posts)
+  // MAIN LOAD: auth + profile + posts (NOT liked posts or replies)
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -115,9 +119,11 @@ export default function ProfilePageClient({ profileId }) {
       const isOwnProfile = targetUserId === user.uid;
       setIsCurrentUserProfile(isOwnProfile);
 
-      // reset liked posts state when viewing a profile
+      // reset liked posts + replies state when viewing a profile
       setLikedPosts([]);
       setLikedPostsLoaded(false);
+      setReplies([]);
+      setRepliesLoaded(false);
 
       (async () => {
         try {
@@ -327,8 +333,8 @@ export default function ProfilePageClient({ profileId }) {
             ]);
           }
 
-          // ❌ No liked-posts fetch here
-          // ✅ We'll lazy-load liked posts when the Likes tab is opened.
+          // ❌ No liked-posts or replies fetch here
+          // ✅ We lazy-load them when their tabs are opened.
         } catch (err) {
           console.error('Error loading profile or posts:', err);
           setError('Failed to load profile. Please try again.');
@@ -413,6 +419,83 @@ export default function ProfilePageClient({ profileId }) {
       }
     })();
   }, [activeTab, isCurrentUserProfile, currentUserId, likedPostsLoaded]);
+
+  // ✅ LAZY LOAD: replies (only when Replies tab is opened)
+  useEffect(() => {
+    if (!profile?.uid) return;
+    if (activeTab !== 'replies') return;
+    if (repliesLoaded) return;
+
+    (async () => {
+      try {
+        // all replies across all posts where this user is the author
+        const repliesQ = query(
+          collectionGroup(db, 'replies'),
+          where('authorId', '==', profile.uid),
+          orderBy('createdAt', 'desc')
+        );
+
+        const repliesSnap = await getDocs(repliesQ);
+
+        const replyList = [];
+
+        for (const replyDoc of repliesSnap.docs) {
+          const replyData = replyDoc.data();
+
+          // parent post reference: posts/{postId}
+          const parentPostRef = replyDoc.ref.parent.parent;
+          let parentPostData = null;
+          let parentPostId = null;
+
+          if (parentPostRef) {
+            const parentSnap = await getDoc(parentPostRef);
+            if (parentSnap.exists()) {
+              parentPostId = parentSnap.id;
+              parentPostData = parentSnap.data();
+            }
+          }
+
+          const parentAuthorName =
+            parentPostData?.authorName || 'Member';
+          const parentAuthorEmail =
+            parentPostData?.authorEmail || '';
+          const parentAuthorUsername =
+            parentAuthorEmail?.split?.('@')[0] || 'member';
+
+          replyList.push({
+            id: replyDoc.id,
+            content: replyData.content || '',
+            timestamp: replyData.createdAt
+              ? replyData.createdAt.toDate().toLocaleString()
+              : 'Just now',
+            likes: replyData.likesCount ?? 0,
+            // You can also compute replies-to-reply if you support that
+            comments: parentPostData?.repliesCount ?? 0,
+            shares: 0,
+            isLiked: false, // you can wire this if you like
+            isBookmarked: false,
+            image: parentPostData?.imageUrl || null,
+            authorId: profile.uid,
+            authorName: profile.name,
+            authorEmail: profile.email,
+            authorAvatar: profile.avatar,
+            parentPostId,
+            parentAuthorId: parentPostData?.authorId || null,
+            parentAuthorName,
+            parentAuthorUsername,
+            parentContent: parentPostData?.content || '',
+          });
+        }
+
+        setReplies(replyList);
+      } catch (err) {
+        console.error('Error fetching replies:', err);
+        setReplies([]);
+      } finally {
+        setRepliesLoaded(true);
+      }
+    })();
+  }, [activeTab, profile?.uid, repliesLoaded]);
 
   const handleLike = async (postId, postsArray, setPostsArray) => {
     if (!currentUserId) {
@@ -768,6 +851,89 @@ export default function ProfilePageClient({ profileId }) {
             />
           </Button>
         </div>
+      </Card>
+    );
+  };
+
+  // ✅ Reply card for Replies tab
+  const ReplyCard = ({ reply }) => {
+    return (
+      <Card className="p-6 bg-card/50 backdrop-blur-xl border-border/50 hover:border-primary/30 transition-all duration-300">
+        <div className="flex items-start gap-4 mb-4">
+          <Avatar className="h-12 w-12 ring-2 ring-primary/20">
+            <AvatarImage src={reply.authorAvatar || '/placeholder.svg'} />
+            <AvatarFallback>
+              {reply.authorName
+                ? reply.authorName.slice(0, 2).toUpperCase()
+                : 'HQ'}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-2 ">
+                <h3 className="font-semibold text-foreground">
+                  {reply.authorName}
+                </h3>
+                <span className="text-xs text-muted-foreground">
+                  @{reply.authorEmail?.split?.('@')[0] || 'member'}
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-primary h-8 w-8"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">{reply.timestamp}</p>
+            {reply.parentPostId && (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Replying to{' '}
+                <Link
+                  href={`/member/profile/${reply.parentAuthorId || '#'}`}
+                  className="text-primary hover:underline"
+                  onClick={(e) => {
+                    if (!reply.parentAuthorId) e.preventDefault();
+                  }}
+                >
+                  @{reply.parentAuthorUsername}
+                </Link>
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* Reply content */}
+        <p className="text-foreground mb-4 leading-relaxed">{reply.content}</p>
+
+        {/* Optional preview of parent post */}
+        {reply.parentContent && (
+          <div className="mb-4 rounded-lg border border-border/50 bg-muted/40 p-3 text-sm text-muted-foreground">
+            <p className="mb-1 font-medium">Original post</p>
+            <p className="line-clamp-3">{reply.parentContent}</p>
+            {reply.parentPostId && (
+              <Link
+                href={`/member/post/${reply.parentPostId}`}
+                className="mt-2 inline-flex text-xs text-primary hover:underline"
+              >
+                View conversation
+              </Link>
+            )}
+          </div>
+        )}
+
+        {reply.image && (
+          <div className="mb-4 rounded-lg overflow-hidden border border-border/50">
+            <Image
+              src={reply.image || '/placeholder.svg'}
+              alt="Original post media"
+              className="w-full h-auto"
+              width={600}
+              height={400}
+            />
+          </div>
+        )}
       </Card>
     );
   };
@@ -1237,15 +1403,32 @@ export default function ProfilePageClient({ profileId }) {
           </TabsContent>
 
           <TabsContent value="replies" className="space-y-6">
-            <Card className="p-12 text-center bg-card/50 backdrop-blur-xl border-border/50">
-              <MessageCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
-              <h3 className="text-xl font-semibold text-foreground mb-2">
-                No replies yet
-              </h3>
-              <p className="text-muted-foreground">
-                When {profile.name} replies to posts, they&apos;ll appear here.
-              </p>
-            </Card>
+            {!repliesLoaded ? (
+              <Card className="p-12 text-center bg-card/50 backdrop-blur-xl border-border/50">
+                <Loader2 className="h-10 w-10 mx-auto mb-4 animate-spin text-muted-foreground" />
+                <h3 className="text-xl font-semibold text-foreground mb-2">
+                  Loading replies...
+                </h3>
+                <p className="text-muted-foreground">
+                  Fetching posts you&apos;ve replied to.
+                </p>
+              </Card>
+            ) : replies.length > 0 ? (
+              replies.map((reply) => (
+                <ReplyCard key={reply.id} reply={reply} />
+              ))
+            ) : (
+              <Card className="p-12 text-center bg-card/50 backdrop-blur-xl border-border/50">
+                <MessageCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                <h3 className="text-xl font-semibold text-foreground mb-2">
+                  No replies yet
+                </h3>
+                <p className="text-muted-foreground">
+                  When {profile.name} replies to posts, they&apos;ll appear
+                  here.
+                </p>
+              </Card>
+            )}
           </TabsContent>
 
           <TabsContent value="media" className="space-y-6">
