@@ -9,7 +9,7 @@ import { useAuth } from '@/app/context/AuthContext';
 
 export function AppShell({ children }) {
   const { user, loading } = useAuth();
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(true);
   const pathname = usePathname();
 
   const isHome = pathname === '/';
