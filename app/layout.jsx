@@ -4,6 +4,7 @@ import './globals.css';
 
 import { AppShell } from './AppShell';
 import { ThemeProvider } from './context/ThemeContext';
+import { AuthProvider } from './context/AuthContext';
 
 // Fonts
 const inter = Inter({
@@ -48,7 +49,9 @@ export default function RootLayout({ children }) {
         className={`${inter.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
         <ThemeProvider>
-          <AppShell>{children}</AppShell>
+          <AuthProvider>
+            <AppShell>{children}</AppShell>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

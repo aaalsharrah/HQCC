@@ -57,7 +57,9 @@ export default function NotificationsPage() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (!user) {
-        router.push('/signin');
+        // Again, middleware should block unauth users anyway
+        setCurrentUserId(null);
+        setLoading(false);
         return;
       }
       setCurrentUserId(user.uid);
@@ -65,6 +67,7 @@ export default function NotificationsPage() {
       try {
         const ref = doc(db, 'members', user.uid);
         const snap = await getDoc(ref);
+
         if (snap.exists()) {
           const data = snap.data();
           const n = data.notifications || {};
@@ -253,9 +256,7 @@ export default function NotificationsPage() {
                       <div className="flex items-start gap-3">
                         <Avatar className="h-10 w-10 border-2 border-primary/20">
                           <AvatarImage
-                            src={
-                              notification.user.avatar || '/placeholder.svg'
-                            }
+                            src={notification.user.avatar || '/placeholder.svg'}
                             alt={notification.user.name}
                           />
                           <AvatarFallback>

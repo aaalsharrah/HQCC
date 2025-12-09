@@ -17,7 +17,7 @@ env:
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: 'hqcc-141ca.firebaseapp.com'
+    value: 'hqcc-backend--hqcc-141ca.us-central1.hosted.app'
     availability:
       - BUILD
       - RUNTIME
@@ -41,12 +41,12 @@ env:
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: '1:87707899718:web:0a5989c1bfc3c8a5c73747'
+    value: '1:87707899718:web:04b3fb5178701e79c73747'
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID
-    value: 'G-43JZ8SE4SS'
+    value: 'G-B1QPZRTJYB'
     availability:
       - BUILD
       - RUNTIME
