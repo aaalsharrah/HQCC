@@ -25,6 +25,14 @@ import {
   Code,
 } from 'lucide-react';
 
+// ⬇️ NEW: dropdown menu for 3-dot actions
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+
 import { auth, db, storage } from '@/app/lib/firebase/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
@@ -36,7 +44,9 @@ import {
   orderBy,
   getDocs,
   setDoc,
-  collectionGroup, // ✅ NEW: for querying replies
+  collectionGroup,
+  updateDoc, // ⬅️ NEW
+  deleteDoc, // ⬅️ NEW
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { findOrCreateConversation } from '@/app/lib/firebase/messages';
@@ -100,12 +110,14 @@ export default function ProfilePageClient({ profileId }) {
   const [activeTab, setActiveTab] = useState('posts'); // which tab is active
 
   const [likedPostsLoaded, setLikedPostsLoaded] = useState(false); // lazy load flag
-  const [replies, setReplies] = useState([]); // ✅ replies state
-  const [repliesLoaded, setRepliesLoaded] = useState(false); // ✅ lazy load flag for replies
+  const [replies, setReplies] = useState([]);
+  const [repliesLoaded, setRepliesLoaded] = useState(false);
+
+
 
   const mediaPosts = posts.filter((p) => p.image);
 
-  // MAIN LOAD: auth + profile + posts (NOT liked posts or replies)
+  // MAIN LOAD: auth + profile + posts
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) {
@@ -312,6 +324,10 @@ export default function ProfilePageClient({ profileId }) {
               isLiked,
               isBookmarked: false,
               image: data.imageUrl || null,
+              authorId: data.authorId,
+              authorName: data.authorName || loadedProfile.name,
+              authorEmail: data.authorEmail || loadedProfile.email,
+              authorAvatar: data.authorAvatar || loadedProfile.avatar,
             });
           }
 
@@ -332,9 +348,6 @@ export default function ProfilePageClient({ profileId }) {
               },
             ]);
           }
-
-          // ❌ No liked-posts or replies fetch here
-          // ✅ We lazy-load them when their tabs are opened.
         } catch (err) {
           console.error('Error loading profile or posts:', err);
           setError('Failed to load profile. Please try again.');
@@ -347,7 +360,7 @@ export default function ProfilePageClient({ profileId }) {
     return () => unsub();
   }, [router, profileId]);
 
-  // LAZY LOAD: liked posts (only when Likes tab is opened)
+  // LAZY LOAD: liked posts
   useEffect(() => {
     if (!isCurrentUserProfile || !currentUserId) return;
     if (activeTab !== 'likes') return;
@@ -420,7 +433,7 @@ export default function ProfilePageClient({ profileId }) {
     })();
   }, [activeTab, isCurrentUserProfile, currentUserId, likedPostsLoaded]);
 
-  // ✅ LAZY LOAD: replies (only when Replies tab is opened)
+  // LAZY LOAD: replies
   useEffect(() => {
     if (!profile?.uid) return;
     if (activeTab !== 'replies') return;
@@ -428,7 +441,6 @@ export default function ProfilePageClient({ profileId }) {
 
     (async () => {
       try {
-        // all replies across all posts where this user is the author
         const repliesQ = query(
           collectionGroup(db, 'replies'),
           where('authorId', '==', profile.uid),
@@ -442,7 +454,6 @@ export default function ProfilePageClient({ profileId }) {
         for (const replyDoc of repliesSnap.docs) {
           const replyData = replyDoc.data();
 
-          // parent post reference: posts/{postId}
           const parentPostRef = replyDoc.ref.parent.parent;
           let parentPostData = null;
           let parentPostId = null;
@@ -455,10 +466,8 @@ export default function ProfilePageClient({ profileId }) {
             }
           }
 
-          const parentAuthorName =
-            parentPostData?.authorName || 'Member';
-          const parentAuthorEmail =
-            parentPostData?.authorEmail || '';
+          const parentAuthorName = parentPostData?.authorName || 'Member';
+          const parentAuthorEmail = parentPostData?.authorEmail || '';
           const parentAuthorUsername =
             parentAuthorEmail?.split?.('@')[0] || 'member';
 
@@ -469,10 +478,9 @@ export default function ProfilePageClient({ profileId }) {
               ? replyData.createdAt.toDate().toLocaleString()
               : 'Just now',
             likes: replyData.likesCount ?? 0,
-            // You can also compute replies-to-reply if you support that
             comments: parentPostData?.repliesCount ?? 0,
             shares: 0,
-            isLiked: false, // you can wire this if you like
+            isLiked: false,
             isBookmarked: false,
             image: parentPostData?.imageUrl || null,
             authorId: profile.uid,
@@ -522,7 +530,6 @@ export default function ProfilePageClient({ profileId }) {
     try {
       await toggleLike(postId, currentUserId);
 
-      // Keep likedPosts in sync for own profile
       if (isCurrentUserProfile) {
         if (wasLiked) {
           setLikedPosts((prev) => prev.filter((p) => p.id !== postId));
@@ -610,7 +617,76 @@ export default function ProfilePageClient({ profileId }) {
     }
   };
 
-  // Save profile changes (text + avatar + cover)
+  // ⬇️ NEW: start editing a post
+  const startEditPost = (post) => {
+    setEditingPostId(post.id);
+    setEditingPostContent(post.content || '');
+  };
+
+  const cancelEditPost = () => {
+    setEditingPostId(null);
+    setEditingPostContent('');
+  };
+
+  const saveEditPost = async () => {
+    if (!editingPostId) return;
+    const trimmed = editingPostContent.trim();
+    if (!trimmed) {
+      alert('Post content cannot be empty.');
+      return;
+    }
+
+    try {
+      setPostSaving(true);
+      const postRef = doc(db, 'posts', editingPostId);
+      await updateDoc(postRef, { content: trimmed });
+
+      // update local posts
+      setPosts((prev) =>
+        prev.map((p) =>
+          p.id === editingPostId ? { ...p, content: trimmed } : p
+        )
+      );
+
+      // also update likedPosts if present
+      setLikedPosts((prev) =>
+        prev.map((p) =>
+          p.id === editingPostId ? { ...p, content: trimmed } : p
+        )
+      );
+
+      cancelEditPost();
+    } catch (err) {
+      console.error('Failed to update post', err);
+      alert('Failed to update post. Please try again.');
+    } finally {
+      setPostSaving(false);
+    }
+  };
+
+  // ⬇️ NEW: delete a post
+  const deletePost = async (post) => {
+    const postId = post.id;
+    if (!postId) return;
+    const ok = window.confirm('Delete this post? This cannot be undone.');
+    if (!ok) return;
+
+    try {
+      setPostDeletingId(postId);
+      const postRef = doc(db, 'posts', postId);
+      await deleteDoc(postRef);
+
+      setPosts((prev) => prev.filter((p) => p.id !== postId));
+      setLikedPosts((prev) => prev.filter((p) => p.id !== postId));
+    } catch (err) {
+      console.error('Failed to delete post', err);
+      alert('Failed to delete post. Please try again.');
+    } finally {
+      setPostDeletingId(null);
+    }
+  };
+
+  // Save profile changes
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     if (!profile) return;
@@ -618,7 +694,6 @@ export default function ProfilePageClient({ profileId }) {
     try {
       setSaving(true);
 
-      // Validate locally first
       if (avatarFile) {
         const avatarError = validateFile(avatarFile, 'avatar');
         if (avatarError) {
@@ -640,7 +715,6 @@ export default function ProfilePageClient({ profileId }) {
       let avatarUrl = profile.avatar;
       let coverUrl = profile.coverImage;
 
-      // Upload avatar
       if (avatarFile) {
         try {
           const avatarRef = ref(storage, `avatars/${profile.uid}`);
@@ -666,7 +740,6 @@ export default function ProfilePageClient({ profileId }) {
         }
       }
 
-      // Upload cover
       if (coverFile) {
         try {
           const coverRef = ref(storage, `covers/${profile.uid}`);
@@ -692,7 +765,6 @@ export default function ProfilePageClient({ profileId }) {
         }
       }
 
-      // Save to Firestore
       const refDoc = doc(db, 'members', profile.uid);
       await setDoc(
         refDoc,
@@ -713,7 +785,6 @@ export default function ProfilePageClient({ profileId }) {
         { merge: true }
       );
 
-      // Update local state
       setProfile((prev) => ({
         ...prev,
         name: editData.name.trim() || prev.name,
@@ -741,121 +812,249 @@ export default function ProfilePageClient({ profileId }) {
       setSaving(false);
     }
   };
-
-  const PostCard = ({ post, postsArray, setPostsArray }) => {
-    const displayName = post.authorName || profile.name;
-    const displayUsername =
-      post.authorEmail?.split?.('@')[0] || profile.username;
-    const displayAvatar = post.authorAvatar || profile.avatar;
-
-    return (
-      <Card className="p-6 bg-card/50 backdrop-blur-xl border-border/50 hover:border-primary/30 transition-all duration-300">
-        <div className="flex items-start gap-4 mb-4">
-          <Avatar className="h-12 w-12 ring-2 ring-primary/20">
-            <AvatarImage src={displayAvatar || '/placeholder.svg'} />
-            <AvatarFallback>
-              {displayName ? displayName.slice(0, 2).toUpperCase() : 'HQ'}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1">
-            <div className="flex items-center justify-between mb-1">
-              <div className="flex items-center gap-2 ">
-                {post.authorId ? (
-                  <Link
-                    href={`/member/profile/${post.authorId}`}
-                    className="font-semibold text-foreground hover:text-primary transition-colors"
-                  >
-                    {displayName}
-                  </Link>
-                ) : (
-                  <h3 className="font-semibold text-foreground">
-                    {displayName}
-                  </h3>
-                )}
-                <span className="text-xs text-muted-foreground">
-                  @{displayUsername}
-                </span>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-primary h-8 w-8"
-              >
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </div>
-            <p className="text-sm text-muted-foreground">{post.timestamp}</p>
-          </div>
-        </div>
-
-        <p className="text-foreground mb-4 leading-relaxed">{post.content}</p>
-
-        {post.image && (
-          <div className="mb-4 rounded-lg overflow-hidden border border-border/50">
-            <Image
-              src={post.image || '/placeholder.svg'}
-              alt="Post content"
-              className="w-full h-auto"
-              width={600}
-              height={400}
-            />
-          </div>
-        )}
-
-        <div className="flex items-center justify-between pt-4 border-t border-border/50">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleLike(post.id, postsArray, setPostsArray)}
-            className={`gap-2 ${
-              post.isLiked
-                ? 'text-red-500 hover:text-red-600'
-                : 'text-muted-foreground hover:text-red-500'
-            }`}
-          >
-            <Heart
-              className={`h-5 w-5 ${post.isLiked ? 'fill-current' : ''}`}
-            />
-            <span className="text-sm">{post.likes}</span>
-          </Button>
-
-          <Link
-            href={`/member/post/${post.id}`}
-            className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary text-sm"
-          >
-            <MessageCircle className="h-5 w-5" />
-            <span className="text-sm">{post.comments}</span>
-          </Link>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-2 text-muted-foreground hover:text-primary"
-          >
-            <Share2 className="h-5 w-5" />
-            <span className="text-sm">{post.shares}</span>
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => handleBookmark(post.id, postsArray, setPostsArray)}
-            className={`${
-              post.isBookmarked
-                ? 'text-accent hover:text-accent/80'
-                : 'text-muted-foreground hover:text-accent'
-            }`}
-          >
-            <Bookmark
-              className={`h-5 w-5 ${post.isBookmarked ? 'fill-current' : ''}`}
-            />
-          </Button>
-        </div>
-      </Card>
+  // Update a post's content in local state
+  const handlePostUpdated = (postId, newContent) => {
+    setPosts((prev) =>
+      prev.map((p) => (p.id === postId ? { ...p, content: newContent } : p))
+    );
+    setLikedPosts((prev) =>
+      prev.map((p) => (p.id === postId ? { ...p, content: newContent } : p))
     );
   };
 
-  // ✅ Reply card for Replies tab
+  // Delete a post in Firestore + local state
+  const handlePostDeleted = async (postId) => {
+    const ok = window.confirm('Delete this post? This cannot be undone.');
+    if (!ok) return;
+
+    try {
+      const postRef = doc(db, 'posts', postId);
+      await deleteDoc(postRef);
+
+      setPosts((prev) => prev.filter((p) => p.id !== postId));
+      setLikedPosts((prev) => prev.filter((p) => p.id !== postId));
+    } catch (err) {
+      console.error('Failed to delete post', err);
+      alert('Failed to delete post. Please try again.');
+    }
+  };
+
+const PostCard = ({ post, postsArray, setPostsArray }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [draftContent, setDraftContent] = useState(post.content || '');
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const displayName = post.authorName || profile.name;
+  const displayUsername =
+    post.authorEmail?.split?.('@')[0] || profile.username;
+  const displayAvatar = post.authorAvatar || profile.avatar;
+
+  const isOwnPost =
+    post.authorId && currentUserId && post.authorId === currentUserId;
+
+  const startEdit = () => {
+    setDraftContent(post.content || '');
+    setIsEditing(true);
+  };
+
+  const cancelEdit = () => {
+    setDraftContent(post.content || '');
+    setIsEditing(false);
+  };
+
+  const saveEdit = async () => {
+    const trimmed = draftContent.trim();
+    if (!trimmed) {
+      alert('Post content cannot be empty.');
+      return;
+    }
+
+    try {
+      setSaving(true);
+      const postRef = doc(db, 'posts', post.id);
+      await updateDoc(postRef, { content: trimmed });
+
+      // update local arrays via helper
+      handlePostUpdated(post.id, trimmed);
+      setIsEditing(false);
+    } catch (err) {
+      console.error('Failed to update post', err);
+      alert('Failed to update post. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteClick = async () => {
+    try {
+      setDeleting(true);
+      await handlePostDeleted(post.id);
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <Card className="p-6 bg-card/50 backdrop-blur-xl border-border/50 hover:border-primary/30 transition-all duration-300">
+      <div className="flex items-start gap-4 mb-4">
+        <Avatar className="h-12 w-12 ring-2 ring-primary/20">
+          <AvatarImage src={displayAvatar || '/placeholder.svg'} />
+          <AvatarFallback>
+            {displayName ? displayName.slice(0, 2).toUpperCase() : 'HQ'}
+          </AvatarFallback>
+        </Avatar>
+        <div className="flex-1">
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2 ">
+              {post.authorId ? (
+                <Link
+                  href={`/member/profile/${post.authorId}`}
+                  className="font-semibold text-foreground hover:text-primary transition-colors"
+                >
+                  {displayName}
+                </Link>
+              ) : (
+                <h3 className="font-semibold text-foreground">
+                  {displayName}
+                </h3>
+              )}
+              <span className="text-xs text-muted-foreground">
+                @{displayUsername}
+              </span>
+            </div>
+
+            {isOwnPost && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:text-primary h-8 w-8"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-32">
+                  <DropdownMenuItem onClick={startEdit}>Edit</DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleDeleteClick}
+                    className="text-destructive focus:text-destructive"
+                    disabled={deleting}
+                  >
+                    {deleting ? 'Deleting…' : 'Delete'}
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+          <p className="text-sm text-muted-foreground">{post.timestamp}</p>
+        </div>
+      </div>
+
+      {/* Content / editor */}
+      {isEditing ? (
+        <div className="mb-4 space-y-2">
+          <textarea
+            value={draftContent}
+            onChange={(e) => setDraftContent(e.target.value)}
+            rows={3}
+            className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm resize-none"
+          />
+          <div className="flex gap-2 justify-end">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={cancelEdit}
+              disabled={saving}
+            >
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              onClick={saveEdit}
+              disabled={saving || !draftContent.trim()}
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Saving
+                </>
+              ) : (
+                'Save'
+              )}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        <p className="text-foreground mb-4 leading-relaxed">{post.content}</p>
+      )}
+
+      {post.image && (
+        <div className="mb-4 rounded-lg overflow-hidden border border-border/50">
+          <Image
+            src={post.image || '/placeholder.svg'}
+            alt="Post content"
+            className="w-full h-auto"
+            width={600}
+            height={400}
+          />
+        </div>
+      )}
+
+      <div className="flex items-center justify-between pt-4 border-t border-border/50">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => handleLike(post.id, postsArray, setPostsArray)}
+          className={`gap-2 ${
+            post.isLiked
+              ? 'text-red-500 hover:text-red-600'
+              : 'text-muted-foreground hover:text-red-500'
+          }`}
+        >
+          <Heart
+            className={`h-5 w-5 ${post.isLiked ? 'fill-current' : ''}`}
+          />
+          <span className="text-sm">{post.likes}</span>
+        </Button>
+
+        <Link
+          href={`/member/post/${post.id}`}
+          className="inline-flex items-center gap-2 text-muted-foreground hover:text-primary text-sm"
+        >
+          <MessageCircle className="h-5 w-5" />
+          <span className="text-sm">{post.comments}</span>
+        </Link>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          className="gap-2 text-muted-foreground hover:text-primary"
+        >
+          <Share2 className="h-5 w-5" />
+          <span className="text-sm">{post.shares}</span>
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => handleBookmark(post.id, postsArray, setPostsArray)}
+          className={`${
+            post.isBookmarked
+              ? 'text-accent hover:text-accent/80'
+              : 'text-muted-foreground hover:text-accent'
+          }`}
+        >
+          <Bookmark
+            className={`h-5 w-5 ${post.isBookmarked ? 'fill-current' : ''}`}
+          />
+        </Button>
+      </div>
+    </Card>
+  );
+};
+
   const ReplyCard = ({ reply }) => {
     return (
       <Card className="p-6 bg-card/50 backdrop-blur-xl border-border/50 hover:border-primary/30 transition-all duration-300">
@@ -904,10 +1103,8 @@ export default function ProfilePageClient({ profileId }) {
           </div>
         </div>
 
-        {/* Reply content */}
         <p className="text-foreground mb-4 leading-relaxed">{reply.content}</p>
 
-        {/* Optional preview of parent post */}
         {reply.parentContent && (
           <div className="mb-4 rounded-lg border border-border/50 bg-muted/40 p-3 text-sm text-muted-foreground">
             <p className="mb-1 font-medium">Original post</p>
@@ -961,7 +1158,6 @@ export default function ProfilePageClient({ profileId }) {
     );
   }
 
-  // ── Social link helpers for display ──────────────────────────────
   const normalizedWebsite = profile.website
     ? profile.website.startsWith('http')
       ? profile.website
@@ -1414,9 +1610,7 @@ export default function ProfilePageClient({ profileId }) {
                 </p>
               </Card>
             ) : replies.length > 0 ? (
-              replies.map((reply) => (
-                <ReplyCard key={reply.id} reply={reply} />
-              ))
+              replies.map((reply) => <ReplyCard key={reply.id} reply={reply} />)
             ) : (
               <Card className="p-12 text-center bg-card/50 backdrop-blur-xl border-border/50">
                 <MessageCircle className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
@@ -1500,7 +1694,7 @@ export default function ProfilePageClient({ profileId }) {
                   key={post.id}
                   post={post}
                   postsArray={likedPosts}
-                  setPostsArray={() => {}}
+                  setPostsArray={setLikedPosts}
                 />
               ))
             ) : (
