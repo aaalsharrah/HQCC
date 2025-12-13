@@ -17,7 +17,7 @@ env:
       - RUNTIME
 
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: 'hqcc-backend--hqcc-141ca.us-central1.hosted.app'
+    value: 'hqcc-141ca.firebaseapp.com'
     availability:
       - BUILD
       - RUNTIME
