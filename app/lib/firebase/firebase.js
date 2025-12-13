@@ -21,10 +21,20 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
-// ✅ Make auth persist across refresh + across tabs (Safari duplication fix)
-setPersistence(auth, browserLocalPersistence).catch((err) => {
-  // Don’t crash the app if Safari blocks storage in some contexts
-  console.warn('Firebase auth persistence error:', err?.code || err);
-});
+// ✅ Safari-safe: ensure we always end up with a known persistence mode
+export const persistenceReady = (async () => {
+  try {
+    await setPersistence(auth, browserLocalPersistence);
+    return "local";
+  } catch (e1) {
+    try {
+      await setPersistence(auth, browserSessionPersistence);
+      return "session";
+    } catch (e2) {
+      await setPersistence(auth, inMemoryPersistence);
+      return "memory";
+    }
+  }
+})();
 export const db = getFirestore(app);
 export const storage = getStorage(app);

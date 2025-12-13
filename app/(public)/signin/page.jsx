@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { ArrowLeft, Mail, Lock, Eye, EyeOff } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-
+import { useAuth } from '@/app/context/AuthContext';
 import { auth } from '@/app/lib/firebase/firebase';
 import {
   signInWithEmailAndPassword,
@@ -20,6 +20,30 @@ import {
 } from 'firebase/auth';
 import { db } from '@/app/lib/firebase/firebase';
 import { doc, getDoc } from 'firebase/firestore';
+
+async function safeSetPersistence(rememberMe) {
+  try {
+    await setPersistence(
+      auth,
+      rememberMe ? browserLocalPersistence : browserSessionPersistence
+    );
+    return;
+  } catch {
+    // Safari fallback
+    await setPersistence(auth, inMemoryPersistence);
+  }
+}
+
+function setClientCookie(name, value, rememberMe) {
+  const secure =
+    typeof window !== 'undefined' && window.location.protocol === 'https:'
+      ? '; Secure'
+      : '';
+  const maxAge = rememberMe ? `; Max-Age=${60 * 60 * 24 * 30}` : ''; // 30 days if remember me
+  document.cookie = `${name}=${encodeURIComponent(
+    value
+  )}; Path=/; SameSite=Lax${secure}${maxAge}`;
+}
 
 export default function SignInPage() {
   const [email, setEmail] = useState('');
@@ -40,6 +64,7 @@ export default function SignInPage() {
         auth,
         rememberMe ? browserLocalPersistence : browserSessionPersistence
       );
+      await safeSetPersistence(rememberMe);
 
       await signInWithEmailAndPassword(auth, email, password);
       const user = auth.currentUser;
@@ -51,8 +76,8 @@ export default function SignInPage() {
       const role = snap.exists() ? snap.data().role || 'member' : 'member';
 
       // 🍪 Set cookies for middleware
-      document.cookie = `logged_in=true; path=/;`;
-      document.cookie = `role=${role}; path=/;`;
+      setClientCookie('logged_in', 'true', rememberMe);
+      setClientCookie('role', role, rememberMe);
 
       // 🔁 Redirect based on role
       if (role === 'admin') {
@@ -89,6 +114,7 @@ export default function SignInPage() {
         auth,
         rememberMe ? browserLocalPersistence : browserSessionPersistence
       );
+      await safeSetPersistence(rememberMe);
 
       const result = await signInWithPopup(auth, provider);
       const user = result.user;

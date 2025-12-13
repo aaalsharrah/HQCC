@@ -25,7 +25,8 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Link from 'next/link';
-import { db, auth } from '@/app/lib/firebase/firebase';
+
+import { db } from '@/app/lib/firebase/firebase';
 import {
   collection,
   getDocs,
@@ -36,10 +37,16 @@ import {
   updateDoc,
   deleteDoc,
 } from 'firebase/firestore';
-import { onAuthStateChanged } from 'firebase/auth';
+
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/app/context/AuthContext';
+
 import { createNotification } from '@/app/lib/firebase/notifications';
 
 export default function AdminDashboard() {
+  const router = useRouter();
+  const { user, loading: authLoading } = useAuth();
+
   const [activeTab, setActiveTab] = useState('overview');
   const [searchQuery, setSearchQuery] = useState('');
   const [events, setEvents] = useState([]);
@@ -107,371 +114,378 @@ export default function AdminDashboard() {
     return `${year}-${month}-${day}`;
   }
 
+  // ✅ KEEP YOUR fetchData exactly as you wrote it (same code),
+  // but put it at component scope so we can call it after role-check.
+  async function fetchData() {
+    try {
+      setLoading(true);
+
+      // --- members ---
+      const membersRef = collection(db, 'members');
+      const membersSnapshot = await getDocs(membersRef);
+      const membersData = membersSnapshot.docs.map((d) => ({
+        id: d.id,
+        uid: d.id,
+        ...d.data(),
+      }));
+
+      // --- posts ---
+      const postsRef = collection(db, 'posts');
+      const postsSnapshot = await getDocs(postsRef);
+      const postsData = postsSnapshot.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }));
+
+      // --- events ---
+      const eventsRef = collection(db, 'events');
+      const eventsSnapshot = await getDocs(eventsRef);
+      const eventsData = eventsSnapshot.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }));
+
+      // --- registrations from subcollections ---
+      // We flatten all events/{eventId}/registrations into one array.
+      const allRegistrations = [];
+      for (const eventDoc of eventsSnapshot.docs) {
+        try {
+          const regsRef = collection(db, 'events', eventDoc.id, 'registrations');
+          const regsSnap = await getDocs(regsRef);
+          regsSnap.docs.forEach((regDoc) => {
+            allRegistrations.push({
+              id: regDoc.id,
+              eventId: eventDoc.id,
+              ...regDoc.data(),
+            });
+          });
+        } catch (e) {
+          console.error(
+            'Error loading registrations subcollection for event',
+            eventDoc.id,
+            e
+          );
+        }
+      }
+
+      // --- analytics ---
+      const totalUsers = membersData.length;
+
+      // active users: posted in last 30 days
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const recentPosts = postsData.filter((post) => {
+        if (!post.createdAt) return false;
+        const postDate =
+          post.createdAt instanceof Timestamp
+            ? post.createdAt.toDate()
+            : post.createdAt?.toDate
+            ? post.createdAt.toDate()
+            : new Date(post.createdAt);
+        return postDate >= thirtyDaysAgo;
+      });
+
+      const activeUserIds = new Set(recentPosts.map((p) => p.authorId));
+      const activeUsers = membersData.filter((m) =>
+        activeUserIds.has(m.uid || m.id)
+      ).length;
+
+      // new users this month
+      const now = new Date();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      const newUsersThisMonth = membersData.filter((m) => {
+        const createdAt = m.createdAt || m.joinedAt;
+        if (!createdAt) return false;
+        const createdDate =
+          createdAt instanceof Timestamp
+            ? createdAt.toDate()
+            : createdAt?.toDate
+            ? createdAt.toDate()
+            : new Date(createdAt);
+        return createdDate >= monthStart;
+      }).length;
+
+      // events stats
+      const totalEvents = eventsData.length;
+      const todayMidnight = new Date();
+      todayMidnight.setHours(0, 0, 0, 0);
+
+      const upcomingEvents = eventsData.filter((e) => {
+        const eventDate = parseEventDate(e.date);
+        return eventDate && eventDate >= todayMidnight;
+      }).length;
+
+      // avg attendance – from events.attendees (fallback: count subcollection)
+      const attendanceValues = eventsData
+        .map((e) => {
+          const fromDoc =
+            typeof e.attendees === 'number'
+              ? e.attendees
+              : typeof e.attendeeCount === 'number'
+              ? e.attendeeCount
+              : null;
+          if (fromDoc !== null) return fromDoc;
+
+          // fallback: count registrations for that event
+          return allRegistrations.filter((r) => r.eventId === e.id).length;
+        })
+        .filter((n) => typeof n === 'number' && !isNaN(n));
+
+      const avgAttendance =
+        attendanceValues.length > 0
+          ? Math.round(
+              attendanceValues.reduce((sum, val) => sum + val, 0) /
+                attendanceValues.length
+            )
+          : 0;
+
+      // engagement rate – from posts / replies / likes as before
+      const engagedUserIds = new Set();
+      recentPosts.forEach((post) => {
+        if (post.authorId) engagedUserIds.add(post.authorId);
+      });
+
+      // replies
+      for (const post of postsData) {
+        try {
+          const repliesRef = collection(db, 'posts', post.id, 'replies');
+          const repliesSnapshot = await getDocs(repliesRef);
+          repliesSnapshot.docs.forEach((replyDoc) => {
+            const replyData = replyDoc.data();
+            if (replyData.authorId) {
+              const replyDate =
+                replyData.createdAt instanceof Timestamp
+                  ? replyData.createdAt.toDate()
+                  : replyData.createdAt?.toDate
+                  ? replyData.createdAt.toDate()
+                  : new Date(replyData.createdAt);
+              if (replyDate >= thirtyDaysAgo) {
+                engagedUserIds.add(replyData.authorId);
+              }
+            }
+          });
+        } catch {
+          // ignore
+        }
+      }
+
+      // likes
+      for (const post of postsData) {
+        try {
+          const likesRef = collection(db, 'posts', post.id, 'likes');
+          const likesSnapshot = await getDocs(likesRef);
+          likesSnapshot.docs.forEach((likeDoc) => {
+            const likeData = likeDoc.data();
+            if (likeData.userId) {
+              const likeDate =
+                likeData.createdAt instanceof Timestamp
+                  ? likeData.createdAt.toDate()
+                  : likeData.createdAt?.toDate
+                  ? likeData.createdAt.toDate()
+                  : new Date(likeData.createdAt);
+              if (likeDate >= thirtyDaysAgo) {
+                engagedUserIds.add(likeData.userId);
+              }
+            }
+          });
+        } catch {
+          // ignore
+        }
+      }
+
+      const engagementRate =
+        totalUsers > 0 ? Math.round((engagedUserIds.size / totalUsers) * 100) : 0;
+
+      setAnalytics({
+        totalUsers,
+        activeUsers,
+        newUsersThisMonth,
+        totalEvents,
+        upcomingEvents,
+        completedEvents: totalEvents - upcomingEvents,
+        avgAttendance,
+        engagementRate,
+      });
+
+      // --- members table (events count from registrations subcollections) ---
+      const processedMembers = await Promise.all(
+        membersData.map(async (member) => {
+          const memberId = member.uid || member.id;
+
+          const memberPosts = postsData.filter((p) => p.authorId === memberId).length;
+
+          const memberRegistrations = allRegistrations.filter(
+            (r) => r.userId === memberId || r.uid === memberId
+          ).length;
+
+          const hasRecentPost = recentPosts.some((p) => p.authorId === memberId);
+          const status = hasRecentPost ? 'Active' : 'Inactive';
+
+          return {
+            id: memberId,
+            name: member.name || 'Member',
+            email: member.email || '',
+            role: member.role || 'Member',
+            status,
+            joinDate: formatDate(member.createdAt || member.joinedAt),
+            posts: memberPosts,
+            events: memberRegistrations,
+          };
+        })
+      );
+
+      processedMembers.sort((a, b) => {
+        const memberA = membersData.find((m) => (m.uid || m.id) === a.id);
+        const memberB = membersData.find((m) => (m.uid || m.id) === b.id);
+        const aDate = memberA?.createdAt || memberA?.joinedAt;
+        const bDate = memberB?.createdAt || memberB?.joinedAt;
+
+        if (aDate && bDate) {
+          const aDateObj =
+            aDate instanceof Timestamp
+              ? aDate.toDate()
+              : aDate?.toDate
+              ? aDate.toDate()
+              : new Date(aDate);
+          const bDateObj =
+            bDate instanceof Timestamp
+              ? bDate.toDate()
+              : bDate?.toDate
+              ? bDate.toDate()
+              : new Date(bDate);
+          return bDateObj - aDateObj;
+        }
+        if (aDate && !bDate) return -1;
+        if (!aDate && bDate) return 1;
+        return 0;
+      });
+
+      setUsers(processedMembers);
+
+      // --- events list for cards (attendees from event doc) ---
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const processedEvents = eventsData.map((event) => {
+        const eventDate = parseEventDate(event.date);
+
+        const attendeesFromDoc =
+          typeof event.attendees === 'number'
+            ? event.attendees
+            : typeof event.attendeeCount === 'number'
+            ? event.attendeeCount
+            : null;
+
+        const attendees =
+          attendeesFromDoc !== null
+            ? attendeesFromDoc
+            : allRegistrations.filter((r) => r.eventId === event.id).length;
+
+        let dateDisplay = '';
+        if (eventDate) {
+          dateDisplay = formatEventDate(eventDate);
+        } else if (event.date && typeof event.date === 'string') {
+          dateDisplay = event.date.split('T')[0];
+        }
+
+        return {
+          id: event.id,
+          title: event.title || 'Untitled Event',
+          date: dateDisplay,
+          originalDate: eventDate || null,
+          time: event.time || '',
+          location: event.location || '',
+          attendees,
+          status: eventDate && eventDate >= today ? 'Scheduled' : 'Completed',
+          category: event.category || 'Event',
+          description: event.description || '',
+          image: event.image || '/placeholder.svg',
+          spots: event.spots || 0,
+          organizer: event.organizer || {
+            name: 'HQCC Team',
+            role: 'Organizer',
+            avatar: '/professional-man.jpg',
+          },
+          agenda: event.agenda || [],
+          requirements: event.requirements || [],
+          attendeesList: event.attendeesList || [],
+        };
+      });
+
+      processedEvents.sort((a, b) => {
+        const aDate = a.date ? new Date(a.date) : new Date(0);
+        const bDate = b.date ? new Date(b.date) : new Date(0);
+        return bDate - aDate;
+      });
+
+      setEvents(processedEvents);
+    } catch (error) {
+      console.error('❌ Error fetching admin dashboard data:', error);
+      setUsers([]);
+      setEvents([]);
+      setAnalytics({
+        totalUsers: 0,
+        activeUsers: 0,
+        newUsersThisMonth: 0,
+        totalEvents: 0,
+        upcomingEvents: 0,
+        completedEvents: 0,
+        avgAttendance: 0,
+        engagementRate: 0,
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ✅ REPLACEMENT: auth guard using AuthContext (NO onAuthStateChanged)
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    let cancelled = false;
+
+    async function run() {
+      // wait until AuthProvider finishes initializing
+      if (authLoading) return;
+
+      // not signed in -> send to signin
       if (!user) {
         setLoading(false);
+        router.replace('/signin');
         return;
       }
 
       try {
+        setLoading(true);
+
+        // check role
         const userDocRef = doc(db, 'members', user.uid);
         const userDocSnap = await getDoc(userDocRef);
+
         if (!userDocSnap.exists()) {
-          setLoading(false);
-          return;
-        }
-        const userData = userDocSnap.data();
-        if (userData.role !== 'admin') {
-          setLoading(false);
+          router.replace('/member');
           return;
         }
 
+        const userData = userDocSnap.data();
+        if (userData.role !== 'admin') {
+          router.replace('/member');
+          return;
+        }
+
+        // load admin dashboard data
         await fetchData();
       } catch (err) {
         console.error('Error checking admin status:', err);
-        setLoading(false);
-      }
-    });
-
-    async function fetchData() {
-      try {
-        setLoading(true);
-
-        // --- members ---
-        const membersRef = collection(db, 'members');
-        const membersSnapshot = await getDocs(membersRef);
-        const membersData = membersSnapshot.docs.map((d) => ({
-          id: d.id,
-          uid: d.id,
-          ...d.data(),
-        }));
-
-        // --- posts ---
-        const postsRef = collection(db, 'posts');
-        const postsSnapshot = await getDocs(postsRef);
-        const postsData = postsSnapshot.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-        }));
-
-        // --- events ---
-        const eventsRef = collection(db, 'events');
-        const eventsSnapshot = await getDocs(eventsRef);
-        const eventsData = eventsSnapshot.docs.map((d) => ({
-          id: d.id,
-          ...d.data(),
-        }));
-
-        // --- registrations from subcollections ---
-        // We flatten all events/{eventId}/registrations into one array.
-        const allRegistrations = [];
-        for (const eventDoc of eventsSnapshot.docs) {
-          try {
-            const regsRef = collection(
-              db,
-              'events',
-              eventDoc.id,
-              'registrations'
-            );
-            const regsSnap = await getDocs(regsRef);
-            regsSnap.docs.forEach((regDoc) => {
-              allRegistrations.push({
-                id: regDoc.id,
-                eventId: eventDoc.id,
-                ...regDoc.data(),
-              });
-            });
-          } catch (e) {
-            console.error(
-              'Error loading registrations subcollection for event',
-              eventDoc.id,
-              e
-            );
-          }
-        }
-
-        // --- analytics ---
-
-        const totalUsers = membersData.length;
-
-        // active users: posted in last 30 days
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-        const recentPosts = postsData.filter((post) => {
-          if (!post.createdAt) return false;
-          const postDate =
-            post.createdAt instanceof Timestamp
-              ? post.createdAt.toDate()
-              : post.createdAt?.toDate
-              ? post.createdAt.toDate()
-              : new Date(post.createdAt);
-          return postDate >= thirtyDaysAgo;
-        });
-
-        const activeUserIds = new Set(recentPosts.map((p) => p.authorId));
-        const activeUsers = membersData.filter((m) =>
-          activeUserIds.has(m.uid || m.id)
-        ).length;
-
-        // new users this month
-        const now = new Date();
-        const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-        const newUsersThisMonth = membersData.filter((m) => {
-          const createdAt = m.createdAt || m.joinedAt;
-          if (!createdAt) return false;
-          const createdDate =
-            createdAt instanceof Timestamp
-              ? createdAt.toDate()
-              : createdAt?.toDate
-              ? createdAt.toDate()
-              : new Date(createdAt);
-          return createdDate >= monthStart;
-        }).length;
-
-        // events stats
-        const totalEvents = eventsData.length;
-        const todayMidnight = new Date();
-        todayMidnight.setHours(0, 0, 0, 0);
-
-        const upcomingEvents = eventsData.filter((e) => {
-          const eventDate = parseEventDate(e.date);
-          return eventDate && eventDate >= todayMidnight;
-        }).length;
-
-        // avg attendance – from events.attendees (fallback: count subcollection)
-        const attendanceValues = eventsData
-          .map((e) => {
-            const fromDoc =
-              typeof e.attendees === 'number'
-                ? e.attendees
-                : typeof e.attendeeCount === 'number'
-                ? e.attendeeCount
-                : null;
-            if (fromDoc !== null) return fromDoc;
-
-            // fallback: count registrations for that event
-            return allRegistrations.filter((r) => r.eventId === e.id).length;
-          })
-          .filter((n) => typeof n === 'number' && !isNaN(n));
-
-        const avgAttendance =
-          attendanceValues.length > 0
-            ? Math.round(
-                attendanceValues.reduce((sum, val) => sum + val, 0) /
-                  attendanceValues.length
-              )
-            : 0;
-
-        // engagement rate – from posts / replies / likes as before
-
-        const engagedUserIds = new Set();
-        recentPosts.forEach((post) => {
-          if (post.authorId) engagedUserIds.add(post.authorId);
-        });
-
-        // replies
-        for (const post of postsData) {
-          try {
-            const repliesRef = collection(db, 'posts', post.id, 'replies');
-            const repliesSnapshot = await getDocs(repliesRef);
-            repliesSnapshot.docs.forEach((replyDoc) => {
-              const replyData = replyDoc.data();
-              if (replyData.authorId) {
-                const replyDate =
-                  replyData.createdAt instanceof Timestamp
-                    ? replyData.createdAt.toDate()
-                    : replyData.createdAt?.toDate
-                    ? replyData.createdAt.toDate()
-                    : new Date(replyData.createdAt);
-                if (replyDate >= thirtyDaysAgo) {
-                  engagedUserIds.add(replyData.authorId);
-                }
-              }
-            });
-          } catch {
-            // ignore
-          }
-        }
-
-        // likes
-        for (const post of postsData) {
-          try {
-            const likesRef = collection(db, 'posts', post.id, 'likes');
-            const likesSnapshot = await getDocs(likesRef);
-            likesSnapshot.docs.forEach((likeDoc) => {
-              const likeData = likeDoc.data();
-              if (likeData.userId) {
-                const likeDate =
-                  likeData.createdAt instanceof Timestamp
-                    ? likeData.createdAt.toDate()
-                    : likeData.createdAt?.toDate
-                    ? likeData.createdAt.toDate()
-                    : new Date(likeData.createdAt);
-                if (likeDate >= thirtyDaysAgo) {
-                  engagedUserIds.add(likeData.userId);
-                }
-              }
-            });
-          } catch {
-            // ignore
-          }
-        }
-
-        const engagementRate =
-          totalUsers > 0
-            ? Math.round((engagedUserIds.size / totalUsers) * 100)
-            : 0;
-
-        setAnalytics({
-          totalUsers,
-          activeUsers,
-          newUsersThisMonth,
-          totalEvents,
-          upcomingEvents,
-          completedEvents: totalEvents - upcomingEvents,
-          avgAttendance,
-          engagementRate,
-        });
-
-        // --- members table (events count from registrations subcollections) ---
-        const processedMembers = await Promise.all(
-          membersData.map(async (member) => {
-            const memberId = member.uid || member.id;
-
-            const memberPosts = postsData.filter(
-              (p) => p.authorId === memberId
-            ).length;
-
-            const memberRegistrations = allRegistrations.filter(
-              (r) => r.userId === memberId || r.uid === memberId
-            ).length;
-
-            const hasRecentPost = recentPosts.some(
-              (p) => p.authorId === memberId
-            );
-            const status = hasRecentPost ? 'Active' : 'Inactive';
-
-            return {
-              id: memberId,
-              name: member.name || 'Member',
-              email: member.email || '',
-              role: member.role || 'Member',
-              status,
-              joinDate: formatDate(member.createdAt || member.joinedAt),
-              posts: memberPosts,
-              events: memberRegistrations,
-            };
-          })
-        );
-
-        processedMembers.sort((a, b) => {
-          const memberA = membersData.find((m) => (m.uid || m.id) === a.id);
-          const memberB = membersData.find((m) => (m.uid || m.id) === b.id);
-          const aDate = memberA?.createdAt || memberA?.joinedAt;
-          const bDate = memberB?.createdAt || memberB?.joinedAt;
-
-          if (aDate && bDate) {
-            const aDateObj =
-              aDate instanceof Timestamp
-                ? aDate.toDate()
-                : aDate?.toDate
-                ? aDate.toDate()
-                : new Date(aDate);
-            const bDateObj =
-              bDate instanceof Timestamp
-                ? bDate.toDate()
-                : bDate?.toDate
-                ? bDate.toDate()
-                : new Date(bDate);
-            return bDateObj - aDateObj;
-          }
-          if (aDate && !bDate) return -1;
-          if (!aDate && bDate) return 1;
-          return 0;
-        });
-
-        setUsers(processedMembers);
-
-        // --- events list for cards (attendees from event doc) ---
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const processedEvents = eventsData.map((event) => {
-          const eventDate = parseEventDate(event.date);
-
-          const attendeesFromDoc =
-            typeof event.attendees === 'number'
-              ? event.attendees
-              : typeof event.attendeeCount === 'number'
-              ? event.attendeeCount
-              : null;
-
-          const attendees =
-            attendeesFromDoc !== null
-              ? attendeesFromDoc
-              : allRegistrations.filter((r) => r.eventId === event.id).length;
-
-          let dateDisplay = '';
-          if (eventDate) {
-            dateDisplay = formatEventDate(eventDate);
-          } else if (event.date && typeof event.date === 'string') {
-            dateDisplay = event.date.split('T')[0];
-          }
-
-          return {
-            id: event.id,
-            title: event.title || 'Untitled Event',
-            date: dateDisplay,
-            originalDate: eventDate || null,
-            time: event.time || '',
-            location: event.location || '',
-            attendees,
-            status: eventDate && eventDate >= today ? 'Scheduled' : 'Completed',
-            category: event.category || 'Event',
-            description: event.description || '',
-            image: event.image || '/placeholder.svg',
-            spots: event.spots || 0,
-            organizer: event.organizer || {
-              name: 'HQCC Team',
-              role: 'Organizer',
-              avatar: '/professional-man.jpg',
-            },
-            agenda: event.agenda || [],
-            requirements: event.requirements || [],
-            attendeesList: event.attendeesList || [],
-          };
-        });
-
-        processedEvents.sort((a, b) => {
-          const aDate = a.date ? new Date(a.date) : new Date(0);
-          const bDate = b.date ? new Date(b.date) : new Date(0);
-          return bDate - aDate;
-        });
-
-        setEvents(processedEvents);
-      } catch (error) {
-        console.error('❌ Error fetching admin dashboard data:', error);
-        setUsers([]);
-        setEvents([]);
-        setAnalytics({
-          totalUsers: 0,
-          activeUsers: 0,
-          newUsersThisMonth: 0,
-          totalEvents: 0,
-          upcomingEvents: 0,
-          completedEvents: 0,
-          avgAttendance: 0,
-          engagementRate: 0,
-        });
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     }
 
-    return () => unsubscribe();
-  }, []);
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [authLoading, user, router]);
 
   // --- event form helpers ---
   const handleFormChange = (field) => (e) => {
@@ -497,9 +511,7 @@ export default function AdminDashboard() {
       organizerAvatar: event.organizer?.avatar || '',
       agendaText: (event.agenda || [])
         .map((item) =>
-          `${item.time || ''} | ${item.title || ''} | ${
-            item.duration || ''
-          }`.trim()
+          `${item.time || ''} | ${item.title || ''} | ${item.duration || ''}`.trim()
         )
         .join('\n'),
       requirementsText: (event.requirements || []).join('\n'),
@@ -560,9 +572,7 @@ export default function AdminDashboard() {
           .map((line) => line.trim())
           .filter(Boolean)
           .map((line) => {
-            const [time, title, duration] = line
-              .split('|')
-              .map((s) => s.trim());
+            const [time, title, duration] = line.split('|').map((s) => s.trim());
             return {
               time: time || '',
               title: title || '',
@@ -639,22 +649,20 @@ export default function AdminDashboard() {
         try {
           const membersRef = collection(db, 'members');
           const membersSnapshot = await getDocs(membersRef);
-          const notificationPromises = membersSnapshot.docs.map(
-            async (memberDoc) => {
-              const memberId = memberDoc.id;
-              if (memberId === auth.currentUser?.uid) return;
+          const notificationPromises = membersSnapshot.docs.map(async (memberDoc) => {
+            const memberId = memberDoc.id;
+            if (memberId === user?.uid) return;
 
-              await createNotification({
-                userId: memberId,
-                type: 'event',
-                actorId: auth.currentUser?.uid || 'system',
-                actorName: 'HQCC Events',
-                actorAvatar: '/quantum-computing-logo.jpg',
-                postId: eventDocRef.id,
-                postContent: `${form.title} - ${form.date} at ${form.time}`,
-              });
-            }
-          );
+            await createNotification({
+              userId: memberId,
+              type: 'event',
+              actorId: user?.uid || 'system',
+              actorName: 'HQCC Events',
+              actorAvatar: '/quantum-computing-logo.jpg',
+              postId: eventDocRef.id,
+              postContent: `${form.title} - ${form.date} at ${form.time}`,
+            });
+          });
           await Promise.all(notificationPromises);
         } catch (error) {
           console.error('Error creating event notifications:', error);
@@ -673,12 +681,7 @@ export default function AdminDashboard() {
       const allRegistrations = [];
       for (const eventDoc of eventsSnapshot.docs) {
         try {
-          const regsRef = collection(
-            db,
-            'events',
-            eventDoc.id,
-            'registrations'
-          );
+          const regsRef = collection(db, 'events', eventDoc.id, 'registrations');
           const regsSnap = await getDocs(regsRef);
           regsSnap.docs.forEach((regDoc) => {
             allRegistrations.push({
@@ -753,6 +756,7 @@ export default function AdminDashboard() {
       alert('Failed to save event. Please try again.');
     }
   };
+
 
   // UI below is same as previous answer, just using events.attendees everywhere
   // (I’ll keep it as-is but now the `event.attendees` values are coming from the
