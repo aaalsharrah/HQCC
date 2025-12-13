@@ -2,7 +2,11 @@
 import { getStorage } from 'firebase/storage';
 
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import {
+  browserLocalPersistence,
+  getAuth,
+  setPersistence,
+} from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -17,5 +21,10 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 export const auth = getAuth(app);
+// ✅ Make auth persist across refresh + across tabs (Safari duplication fix)
+setPersistence(auth, browserLocalPersistence).catch((err) => {
+  // Don’t crash the app if Safari blocks storage in some contexts
+  console.warn('Firebase auth persistence error:', err?.code || err);
+});
 export const db = getFirestore(app);
 export const storage = getStorage(app);
