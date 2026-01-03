@@ -89,6 +89,15 @@ service cloud.firestore {
     match /events/{eventId} {
       allow read: if request.auth != null;
       allow create, update, delete: if request.auth != null && isAdmin();
+
+      // Registrations subcollection (events/{eventId}/registrations)
+      match /registrations/{registrationId} {
+        allow read: if true;
+        allow create: if request.auth != null
+          && request.resource.data.userId == request.auth.uid;
+        allow update, delete: if request.auth != null
+          && (isAdmin() || isBoardMember() || resource.data.userId == request.auth.uid);
+      }
     }
 
     // Reports collection
@@ -98,15 +107,12 @@ service cloud.firestore {
       allow read, update, delete: if isAdmin();
     }
     
-    // Registrations collection
+    // Registrations collection (legacy top-level)
     match /registrations/{registrationId} {
-      // Allow authenticated users to read registrations (needed for event attendee counts)
-      allow read: if request.auth != null;
-      allow create: if request.auth != null 
+      allow read: if true;
+      allow create: if request.auth != null
         && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null 
-        && (isAdmin() || isBoardMember() || resource.data.userId == request.auth.uid);
-      allow delete: if request.auth != null 
+      allow update, delete: if request.auth != null
         && (isAdmin() || isBoardMember() || resource.data.userId == request.auth.uid);
     }
     

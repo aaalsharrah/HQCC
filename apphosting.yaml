@@ -51,6 +51,22 @@ env:
       - BUILD
       - RUNTIME
 
+  - variable: RESEND_API_KEY
+    value: 're_3ybXTs3M_3LsjyNMmEu8GmW9aBq5zvpkA'
+    availability:
+      - RUNTIME
+
+  - variable: CONTACT_TO_EMAIL
+    value: 'subhannadeem06@gmail.com'
+    availability:
+      - RUNTIME
+
+  # Optional: set this to a verified sender in Resend
+  # - variable: CONTACT_FROM_EMAIL
+  #   value: 'you@yourdomain.com'
+  #   availability:
+  #     - RUNTIME
+
   # 👇 Add more if you use them in server code:
   # - variable: STRIPE_SECRET_KEY
   #   value: "sk_live_..."
