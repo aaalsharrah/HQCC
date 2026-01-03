@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 
 import { Navigation } from '@/app/components/Navigation';
@@ -19,6 +19,12 @@ export function AppShell({ children }) {
 
   // Show Sidebar:
   const showSidebar = !!user && !isHome;
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const isMobile = window.matchMedia('(max-width: 767px)').matches;
+    setSidebarCollapsed(isMobile);
+  }, []);
 
   const contentMarginClass = showSidebar
     ? sidebarCollapsed

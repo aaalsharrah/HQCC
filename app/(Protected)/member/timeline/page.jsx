@@ -286,7 +286,9 @@ export default function FeedPage() {
         {/* Post header */}
         <div className="flex items-start gap-4 mb-4">
           <Avatar className="h-12 w-12 ring-2 ring-primary/20">
-            <AvatarImage src="/diverse-user-avatars.png" />
+            <AvatarImage
+              src={post.authorAvatar || '/diverse-user-avatars.png'}
+            />
             <AvatarFallback>
               {post.authorName ? post.authorName.slice(0, 2) : 'HQ'}
             </AvatarFallback>

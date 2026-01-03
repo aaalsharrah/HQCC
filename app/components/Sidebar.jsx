@@ -14,6 +14,7 @@ import {
   LogOut,
   Shield,
   Menu,
+  AlertTriangle,
 } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -210,6 +211,17 @@ export default function Sidebar({ collapsed, onToggle }) {
               </div>
             )}
           </div>
+
+          <Link
+            href="/member/report"
+            onClick={handleNavClick}
+            className={`flex w-full items-center ${
+              collapsed ? 'justify-center' : 'justify-start'
+            } gap-3 px-3 py-2 text-sm font-medium rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 mb-2`}
+          >
+            <AlertTriangle className="h-5 w-5" />
+            {!collapsed && <span>Report an issue</span>}
+          </Link>
 
           <button
             onClick={handleLogout}

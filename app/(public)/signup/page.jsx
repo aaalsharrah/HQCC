@@ -16,7 +16,13 @@ import {
   GithubAuthProvider,
   signInWithPopup,
 } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import {
+  doc,
+  setDoc,
+  serverTimestamp,
+  getDoc,
+  updateDoc,
+} from 'firebase/firestore';
 
 export default function SignUpPage() {
   const [formData, setFormData] = useState({
@@ -63,7 +69,18 @@ export default function SignUpPage() {
         ?.toLowerCase()
         .replace(/[^a-z0-9]/g, '') || 'member';
 
-    await setDoc(doc(db, 'members', user.uid), {
+    const memberRef = doc(db, 'members', user.uid);
+    const memberSnap = await getDoc(memberRef);
+
+    if (memberSnap.exists()) {
+      const existing = memberSnap.data();
+      if (!existing.role) {
+        await updateDoc(memberRef, { role: 'member' });
+      }
+      return;
+    }
+
+    await setDoc(memberRef, {
       uid: user.uid,
       name: name || username,
       email: user.email,

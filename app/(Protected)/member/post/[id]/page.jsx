@@ -177,7 +177,9 @@ export default function PostThreadPage() {
         <Card className="p-6 bg-card/60 backdrop-blur-xl border-border/60">
           <div className="flex items-start gap-4 mb-4">
             <Avatar className="h-12 w-12 ring-2 ring-primary/20">
-              <AvatarImage src="/diverse-user-avatars.png" />
+              <AvatarImage
+                src={post.authorAvatar || '/diverse-user-avatars.png'}
+              />
               <AvatarFallback>
                 {post.authorName ? post.authorName.slice(0, 2) : 'HQ'}
               </AvatarFallback>
@@ -275,7 +277,9 @@ export default function PostThreadPage() {
               <Card key={reply.id} className="p-4 bg-card/40 border-border/50">
                 <div className="flex items-start gap-3">
                   <Avatar className="h-9 w-9 ring-2 ring-primary/10">
-                    <AvatarImage src="/diverse-user-avatars.png" />
+                    <AvatarImage
+                      src={reply.authorAvatar || '/diverse-user-avatars.png'}
+                    />
                     <AvatarFallback>
                       {reply.authorName ? reply.authorName.slice(0, 2) : 'HQ'}
                     </AvatarFallback>

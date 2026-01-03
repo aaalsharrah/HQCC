@@ -51,6 +51,7 @@ export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState('');
   const [events, setEvents] = useState([]);
   const [users, setUsers] = useState([]);
+  const [updatingRoleId, setUpdatingRoleId] = useState(null);
   const [analytics, setAnalytics] = useState({
     totalUsers: 0,
     activeUsers: 0,
@@ -326,7 +327,7 @@ export default function AdminDashboard() {
             id: memberId,
             name: member.name || 'Member',
             email: member.email || '',
-            role: member.role || 'Member',
+            role: (member.role || 'member').toLowerCase(),
             status,
             joinDate: formatDate(member.createdAt || member.joinedAt),
             posts: memberPosts,
@@ -493,6 +494,28 @@ export default function AdminDashboard() {
       ...prev,
       [field]: e.target.value,
     }));
+  };
+
+  const handleRoleChange = async (memberId, nextRole) => {
+    if (!memberId) return;
+    if (memberId === user?.uid) {
+      alert("You can't change your own role.");
+      return;
+    }
+
+    try {
+      setUpdatingRoleId(memberId);
+      const memberRef = doc(db, 'members', memberId);
+      await updateDoc(memberRef, { role: nextRole });
+      setUsers((prev) =>
+        prev.map((u) => (u.id === memberId ? { ...u, role: nextRole } : u))
+      );
+    } catch (err) {
+      console.error('Failed to update role:', err);
+      alert('Failed to update role. Please try again.');
+    } finally {
+      setUpdatingRoleId(null);
+    }
   };
 
   const startEditingEvent = (event) => {
@@ -1151,7 +1174,20 @@ export default function AdminDashboard() {
                                 </div>
                               </td>
                               <td className="p-4">
-                                <Badge variant="outline">{user.role}</Badge>
+                                <select
+                                  value={user.role}
+                                  onChange={(e) =>
+                                    handleRoleChange(user.id, e.target.value)
+                                  }
+                                  disabled={
+                                    updatingRoleId === user.id ||
+                                    user.id === user?.uid
+                                  }
+                                  className="h-9 rounded-md border border-border bg-background/50 px-2 text-sm text-foreground disabled:opacity-60"
+                                >
+                                  <option value="member">Member</option>
+                                  <option value="admin">Admin</option>
+                                </select>
                               </td>
                               <td className="p-4">
                                 <Badge

@@ -35,6 +35,23 @@ export function subscribeToPosts(callback, userId = null) {
       const postsPromises = snapshot.docs.map(async (d) => {
         const data = d.data();
 
+        let authorAvatar = data.authorAvatar || null;
+        let authorName = data.authorName || null;
+
+        if ((!authorAvatar || !authorName) && data.authorId) {
+          try {
+            const memberRef = doc(db, 'members', data.authorId);
+            const memberSnap = await getDoc(memberRef);
+            if (memberSnap.exists()) {
+              const memberData = memberSnap.data();
+              authorAvatar = authorAvatar || memberData.avatar || null;
+              authorName = authorName || memberData.name || null;
+            }
+          } catch (err) {
+            console.error('Error fetching member profile for post:', err);
+          }
+        }
+
         // Check if current user has liked this post
         let isLiked = false;
         if (userId) {
@@ -51,8 +68,8 @@ export function subscribeToPosts(callback, userId = null) {
           id: d.id,
           authorId: data.authorId,
           authorEmail: data.authorEmail,
-          authorName: data.authorName,
-          authorAvatar: data.authorAvatar || null,
+          authorName: authorName || 'Member',
+          authorAvatar,
           content: data.content,
           createdAt: data.createdAt,
           likesCount: data.likesCount ?? 0,
@@ -90,13 +107,29 @@ export async function createPost({ content, user, imageUrl = null }) {
 
   const postsRef = collection(db, POSTS_COLLECTION);
 
+  let authorAvatar = user.photoURL || null;
+  let authorName =
+    user.displayName ||
+    (user.email && user.email.split('@')[0]) ||
+    'Member';
+
+  try {
+    const memberRef = doc(db, 'members', user.uid);
+    const memberSnap = await getDoc(memberRef);
+    if (memberSnap.exists()) {
+      const memberData = memberSnap.data();
+      authorAvatar = memberData.avatar || authorAvatar;
+      authorName = memberData.name || authorName;
+    }
+  } catch (err) {
+    console.warn('Failed to load member profile for post avatar:', err);
+  }
+
   const postDoc = {
     authorId: user.uid,
-    authorName:
-      user.displayName ||
-      (user.email && user.email.split('@')[0]) ||
-      'Member',
+    authorName,
     authorEmail: user.email || null,
+    authorAvatar,
     content,
     createdAt: serverTimestamp(),
     likesCount: 0,
@@ -141,6 +174,23 @@ export function subscribeToPost(postId, callback, userId = null) {
 
     const data = snap.data();
 
+    let authorAvatar = data.authorAvatar || null;
+    let authorName = data.authorName || null;
+
+    if ((!authorAvatar || !authorName) && data.authorId) {
+      try {
+        const memberRef = doc(db, 'members', data.authorId);
+        const memberSnap = await getDoc(memberRef);
+        if (memberSnap.exists()) {
+          const memberData = memberSnap.data();
+          authorAvatar = authorAvatar || memberData.avatar || null;
+          authorName = authorName || memberData.name || null;
+        }
+      } catch (err) {
+        console.error('Error fetching member profile for post:', err);
+      }
+    }
+
     // Check if current user has liked this post
     let isLiked = false;
     if (userId) {
@@ -157,8 +207,8 @@ export function subscribeToPost(postId, callback, userId = null) {
       id: snap.id,
       authorId: data.authorId,
       authorEmail: data.authorEmail,
-      authorName: data.authorName,
-      authorAvatar: data.authorAvatar || null,
+      authorName: authorName || 'Member',
+      authorAvatar,
       content: data.content,
       createdAt: data.createdAt,
       likesCount: data.likesCount ?? 0,
