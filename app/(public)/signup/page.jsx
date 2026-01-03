@@ -41,27 +41,6 @@ export default function SignUpPage() {
     setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
-  const createProfileDoc = async (user, name) => {
-    const username =
-      user.email
-        ?.split('@')[0]
-        ?.toLowerCase()
-        .replace(/[^a-z0-9]/g, '') || 'member';
-
-    await setDoc(doc(db, 'profiles', user.uid), {
-      uid: user.uid,
-      name: name || username,
-      email: user.email,
-      username,
-      bio: '',
-      location: '',
-      website: '',
-      avatar: user.photoURL || null,
-      coverImage: null,
-      createdAt: serverTimestamp(),
-    });
-  };
-
   const createMemberDoc = async (user, name) => {
     const username =
       user.email
@@ -118,8 +97,7 @@ export default function SignUpPage() {
         displayName: name,
       });
 
-      // 🔹 Create both profile + member docs
-      await createProfileDoc(userCred.user, name);
+      // 🔹 Create member doc
       await createMemberDoc(userCred.user, name);
 
       // 🔹 Set cookies so middleware considers them logged in
@@ -157,8 +135,7 @@ export default function SignUpPage() {
       const result = await signInWithPopup(auth, provider);
       const user = result.user;
 
-      // Create docs if they don't exist
-      await createProfileDoc(user, user.displayName);
+      // Create member doc if it doesn't exist
       await createMemberDoc(user, user.displayName);
 
       // Set cookies for middleware

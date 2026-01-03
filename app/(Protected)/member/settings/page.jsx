@@ -10,6 +10,17 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 import { Lock, Shield, Bell, Palette, Mail, Save, Trash2 } from 'lucide-react';
 
@@ -21,12 +32,14 @@ import {
   updatePassword,
   reauthenticateWithCredential,
   EmailAuthProvider,
+  deleteUser,
 } from 'firebase/auth';
 import {
   doc,
   getDoc,
   setDoc,
   updateDoc,
+  deleteDoc,
   serverTimestamp,
   collection,
   query,
@@ -44,6 +57,8 @@ export default function SettingsPage() {
   const [savingPrivacy, setSavingPrivacy] = useState(false);
   const [savingNotifications, setSavingNotifications] = useState(false);
   const [savingAppearance, setSavingAppearance] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
 
   const [profile, setProfile] = useState(null);
 
@@ -74,6 +89,34 @@ export default function SettingsPage() {
 
   const handleAppearanceChange = (patch) => {
     updateAppearance(patch);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!currentUser) return;
+    if (deleteConfirmText.trim().toLowerCase() !== 'delete') {
+      alert('Type DELETE to confirm account deletion.');
+      return;
+    }
+
+    try {
+      setDeletingAccount(true);
+
+      const memberRef = doc(db, 'members', currentUser.uid);
+      await deleteDoc(memberRef);
+
+      await deleteUser(currentUser);
+      router.replace('/signin');
+    } catch (err) {
+      console.error('Error deleting account:', err);
+      alert(
+        err?.code === 'auth/requires-recent-login'
+          ? 'Please log in again, then retry deleting your account.'
+          : 'Failed to delete account. Please try again.'
+      );
+    } finally {
+      setDeletingAccount(false);
+      setDeleteConfirmText('');
+    }
   };
 
   const prettyRole = (value) => {
@@ -566,10 +609,55 @@ export default function SettingsPage() {
                     Once you delete your account, there is no going back. Please
                     be certain.
                   </p>
-                  <Button variant="destructive" className="gap-2" type="button">
-                    <Trash2 className="h-4 w-4" />
-                    Delete Account
-                  </Button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="destructive"
+                        className="gap-2"
+                        type="button"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                        Delete Account
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>
+                          Delete your account?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This action is permanent. Type DELETE to confirm.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <div className="space-y-2">
+                        <Label htmlFor="delete-confirm">Confirmation</Label>
+                        <Input
+                          id="delete-confirm"
+                          value={deleteConfirmText}
+                          onChange={(e) =>
+                            setDeleteConfirmText(e.target.value)
+                          }
+                          placeholder="Type DELETE"
+                          className="bg-background/50 border-border/50"
+                        />
+                      </div>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel disabled={deletingAccount}>
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleDeleteAccount}
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          disabled={
+                            deletingAccount ||
+                            deleteConfirmText.trim().toLowerCase() !== 'delete'
+                          }
+                        >
+                          {deletingAccount ? 'Deleting...' : 'Delete Account'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </div>
               </div>
             </Card>
