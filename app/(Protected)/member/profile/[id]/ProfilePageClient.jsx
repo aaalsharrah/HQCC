@@ -50,7 +50,7 @@ import {
 } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { findOrCreateConversation } from '@/app/lib/firebase/messages';
-import { toggleLike } from '@/app/lib/firebase/post';
+import { toggleLike, deletePostWithChildren } from '@/app/lib/firebase/post';
 
 // Helper: validate avatar/cover files before upload
 function validateFile(file, type = 'image') {
@@ -70,6 +70,11 @@ function validateFile(file, type = 'image') {
   }
 
   return null;
+}
+
+function normalizeAvatar(value) {
+  if (!value || value === '/quantum-computing-student.jpg') return null;
+  return value;
 }
 
 // Helper: get reply count for a post
@@ -160,9 +165,8 @@ export default function ProfilePageClient({ profileId }) {
               name: user.displayName || user.email?.split('@')[0] || 'Member',
               username: user.email?.split('@')[0] || 'member',
               email: user.email || '',
-              avatar: user.photoURL || null,
-              coverImage:
-                '/quantum-computing-chip-with-glowing-circuits-and-b.jpg',
+              avatar: normalizeAvatar(user.photoURL || null),
+              coverImage: '/placeholder.svg',
               bio: 'HQCC member | Quantum & Computing Enthusiast',
               location: 'Hempstead, NY',
               website: 'hqcc.hofstra.edu',
@@ -220,10 +224,8 @@ export default function ProfilePageClient({ profileId }) {
                 'Member',
               username: data.username || data.email?.split('@')[0] || 'member',
               email: data.email || user.email || '',
-              avatar: data.avatar || user.photoURL || null,
-              coverImage:
-                data.coverImage ||
-                '/quantum-computing-chip-with-glowing-circuits-and-b.jpg',
+              avatar: normalizeAvatar(data.avatar || user.photoURL || null),
+              coverImage: data.coverImage || '/placeholder.svg',
               bio: data.bio || 'HQCC member | Quantum & Computing Enthusiast',
               location: data.location || 'Hempstead, NY',
               website,
@@ -673,8 +675,7 @@ export default function ProfilePageClient({ profileId }) {
 
     try {
       setPostDeletingId(postId);
-      const postRef = doc(db, 'posts', postId);
-      await deleteDoc(postRef);
+      await deletePostWithChildren(postId);
 
       setPosts((prev) => prev.filter((p) => p.id !== postId));
       setLikedPosts((prev) => prev.filter((p) => p.id !== postId));
@@ -828,8 +829,7 @@ export default function ProfilePageClient({ profileId }) {
     if (!ok) return;
 
     try {
-      const postRef = doc(db, 'posts', postId);
-      await deleteDoc(postRef);
+      await deletePostWithChildren(postId);
 
       setPosts((prev) => prev.filter((p) => p.id !== postId));
       setLikedPosts((prev) => prev.filter((p) => p.id !== postId));

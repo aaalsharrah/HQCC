@@ -195,7 +195,7 @@ export async function getOtherUser(conversationId, currentUserId) {
     if (!memberSnap.exists()) {
       return {
         id: otherUserId,
-        name: 'Unknown User',
+        name: 'User deleted',
         email: '',
       };
     }
@@ -203,9 +203,9 @@ export async function getOtherUser(conversationId, currentUserId) {
     const memberData = memberSnap.data();
     return {
       id: otherUserId,
-      name: memberData.name || 'Unknown User',
-      email: memberData.email || '',
-      avatar: memberData.avatar || null,
+      name: memberData.deleted ? 'User deleted' : memberData.name || 'User deleted',
+      email: memberData.deleted ? '' : memberData.email || '',
+      avatar: memberData.deleted ? null : memberData.avatar || null,
     };
   } catch (error) {
     console.error('Error getting other user:', error);
@@ -335,4 +335,3 @@ export async function deleteConversation(conversationId) {
   const conversationRef = doc(db, 'conversations', conversationId);
   await deleteDoc(conversationRef);
 }
-

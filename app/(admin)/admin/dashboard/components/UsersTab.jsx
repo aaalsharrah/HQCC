@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import {
   Search,
   Filter,
@@ -8,27 +9,54 @@ import {
   Clock,
   Loader2,
   Eye,
-  Edit,
   Mail,
   Trash2,
-  MoreVertical,
 } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { TabsContent } from '@/components/ui/tabs';
+import Link from 'next/link';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 export default function UsersTab({
   loading,
   users,
   searchQuery,
   onSearchChange,
+  roleFilter,
+  onRoleFilterChange,
   onRoleChange,
+  onDeleteUser,
   updatingRoleId,
   currentUserId,
 }) {
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+
+  const closeDeleteDialog = () => {
+    setDeleteTarget(null);
+    setDeleteConfirmText('');
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    await onDeleteUser(deleteTarget.id);
+    closeDeleteDialog();
+  };
+
   return (
     <TabsContent value="users" className="space-y-6">
       <Card className="p-6 bg-card/50 backdrop-blur-xl border-border">
@@ -43,10 +71,18 @@ export default function UsersTab({
             />
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" className="gap-2 bg-transparent">
-              <Filter className="h-4 w-4" />
-              Filter
-            </Button>
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <select
+                value={roleFilter}
+                onChange={(e) => onRoleFilterChange(e.target.value)}
+                className="h-9 rounded-md border border-border bg-background/50 px-2 text-sm text-foreground"
+              >
+                <option value="all">All</option>
+                <option value="member">Members</option>
+                <option value="admin">Admins</option>
+              </select>
+            </div>
           </div>
         </div>
       </Card>
@@ -95,6 +131,9 @@ export default function UsersTab({
                       user.role.toLowerCase().includes(query)
                     );
                   })
+                  .filter((user) =>
+                    roleFilter === 'all' ? true : user.role === roleFilter
+                  )
                   .map((user) => (
                     <tr
                       key={user.id}
@@ -168,36 +207,34 @@ export default function UsersTab({
                       </td>
                       <td className="p-4">
                         <div className="flex items-center justify-end gap-1">
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 hover:text-primary"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 hover:text-accent"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-8 w-8 hover:text-primary"
-                          >
-                            <Mail className="h-4 w-4" />
-                          </Button>
+                          <Link href={`/member/profile/${user.id}`}>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 hover:text-primary"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </Link>
+                          <a href={`mailto:${user.email}`}>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-8 w-8 hover:text-primary"
+                            >
+                              <Mail className="h-4 w-4" />
+                            </Button>
+                          </a>
                           <Button
                             size="icon"
                             variant="ghost"
                             className="h-8 w-8 hover:text-destructive"
+                            onClick={() =>
+                              setDeleteTarget({ id: user.id, name: user.name })
+                            }
+                            disabled={user.id === currentUserId}
                           >
                             <Trash2 className="h-4 w-4" />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="h-8 w-8">
-                            <MoreVertical className="h-4 w-4" />
                           </Button>
                         </div>
                       </td>
@@ -208,6 +245,39 @@ export default function UsersTab({
           </table>
         </div>
       </Card>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={closeDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this user?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action is permanent. Type CONFIRM DELETE to proceed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-2">
+            <Label htmlFor="delete-user-confirm">Confirmation</Label>
+            <Input
+              id="delete-user-confirm"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="Type CONFIRM DELETE"
+              className="bg-background/50 border-border"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={closeDeleteDialog}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleteConfirmText.trim().toLowerCase() !== 'confirm delete'}
+            >
+              Delete User
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </TabsContent>
   );
 }

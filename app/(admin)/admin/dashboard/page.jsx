@@ -22,6 +22,7 @@ export default function AdminDashboard() {
 
   const [activeTab, setActiveTab] = useState('overview');
   const [searchQuery, setSearchQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState('all');
   const {
     analytics,
     events,
@@ -35,6 +36,7 @@ export default function AdminDashboard() {
     handleRoleChange,
     handleCreateEvent,
     handleDeleteEvent,
+    handleDeleteUser,
     startEditingEvent,
     resetForm,
   } = useAdminDashboardData({
@@ -130,7 +132,10 @@ export default function AdminDashboard() {
               users={users}
               searchQuery={searchQuery}
               onSearchChange={setSearchQuery}
+              roleFilter={roleFilter}
+              onRoleFilterChange={setRoleFilter}
               onRoleChange={handleRoleChange}
+              onDeleteUser={handleDeleteUser}
               updatingRoleId={updatingRoleId}
               currentUserId={user?.uid}
             />

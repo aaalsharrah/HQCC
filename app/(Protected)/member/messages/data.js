@@ -5,7 +5,7 @@ export const conversations = [
     id: 1,
     name: 'Sarah Chen',
     username: '@sarahchen',
-    avatar: '/quantum-computing-student.jpg',
+    avatar: '/placeholder.svg',
     lastMessage: 'Did you see the latest quantum algorithm paper?',
     timestamp: '2m',
     unread: 2,

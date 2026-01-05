@@ -13,6 +13,7 @@ import {
   deleteDoc,
   getDoc,
   getDocs,
+  writeBatch,
 } from 'firebase/firestore';
 import { db } from '@/app/lib/firebase/firebase';
 import { createNotification } from './notifications';
@@ -38,14 +39,19 @@ export function subscribeToPosts(callback, userId = null) {
         let authorAvatar = data.authorAvatar || null;
         let authorName = data.authorName || null;
 
-        if ((!authorAvatar || !authorName) && data.authorId) {
+        if (data.authorId) {
           try {
             const memberRef = doc(db, 'members', data.authorId);
             const memberSnap = await getDoc(memberRef);
             if (memberSnap.exists()) {
               const memberData = memberSnap.data();
-              authorAvatar = authorAvatar || memberData.avatar || null;
-              authorName = authorName || memberData.name || null;
+              if (memberData.deleted) {
+                authorAvatar = null;
+                authorName = 'User deleted';
+              } else {
+                authorAvatar = authorAvatar || memberData.avatar || null;
+                authorName = authorName || memberData.name || null;
+              }
             }
           } catch (err) {
             console.error('Error fetching member profile for post:', err);
@@ -177,14 +183,19 @@ export function subscribeToPost(postId, callback, userId = null) {
     let authorAvatar = data.authorAvatar || null;
     let authorName = data.authorName || null;
 
-    if ((!authorAvatar || !authorName) && data.authorId) {
+    if (data.authorId) {
       try {
         const memberRef = doc(db, 'members', data.authorId);
         const memberSnap = await getDoc(memberRef);
         if (memberSnap.exists()) {
           const memberData = memberSnap.data();
-          authorAvatar = authorAvatar || memberData.avatar || null;
-          authorName = authorName || memberData.name || null;
+          if (memberData.deleted) {
+            authorAvatar = null;
+            authorName = 'User deleted';
+          } else {
+            authorAvatar = authorAvatar || memberData.avatar || null;
+            authorName = authorName || memberData.name || null;
+          }
         }
       } catch (err) {
         console.error('Error fetching member profile for post:', err);
@@ -233,16 +244,38 @@ export function subscribeToReplies(postId, callback) {
   const repliesRef = collection(db, POSTS_COLLECTION, postId, 'replies');
   const q = query(repliesRef, orderBy('createdAt', 'asc'));
 
-  const unsub = onSnapshot(q, (snapshot) => {
-    const replies = snapshot.docs.map((d) => {
+  const unsub = onSnapshot(q, async (snapshot) => {
+    const repliesPromises = snapshot.docs.map(async (d) => {
       const data = d.data();
+      let authorAvatar = data.authorAvatar || null;
+
+      if (data.authorId) {
+        try {
+          const memberRef = doc(db, 'members', data.authorId);
+          const memberSnap = await getDoc(memberRef);
+          if (memberSnap.exists()) {
+            const memberData = memberSnap.data();
+            if (memberData.deleted) {
+              authorAvatar = null;
+            } else {
+              authorAvatar = memberData.avatar || null;
+            }
+          }
+        } catch (err) {
+          console.error('Error fetching member avatar for reply:', err);
+        }
+      }
+
+      const authorName = data.authorName || 'Member';
+      const authorEmail = data.authorEmail || null;
 
       return {
         id: d.id,
         content: data.content,
         authorId: data.authorId,
-        authorName: data.authorName,
-        authorEmail: data.authorEmail,
+        authorName,
+        authorEmail,
+        authorAvatar,
         createdAt: data.createdAt,
         timestamp: data.createdAt
           ? data.createdAt.toDate().toLocaleString()
@@ -250,6 +283,7 @@ export function subscribeToReplies(postId, callback) {
       };
     });
 
+    const replies = await Promise.all(repliesPromises);
     callback(replies);
   });
 
@@ -264,13 +298,27 @@ export async function createReply({ postId, content, user }) {
 
   const repliesRef = collection(db, POSTS_COLLECTION, postId, 'replies');
 
-  const displayName = user.displayName || user.email || 'Member';
+  let displayName = user.displayName || user.email || 'Member';
+  let authorAvatar = user.photoURL || null;
+
+  try {
+    const memberRef = doc(db, 'members', user.uid);
+    const memberSnap = await getDoc(memberRef);
+    if (memberSnap.exists()) {
+      const memberData = memberSnap.data();
+      displayName = memberData.name || displayName;
+      authorAvatar = memberData.avatar || authorAvatar;
+    }
+  } catch (err) {
+    console.error('Error loading member profile for reply:', err);
+  }
 
   await addDoc(repliesRef, {
     content,
     authorId: user.uid,
     authorName: displayName,
     authorEmail: user.email || null,
+    authorAvatar,
     createdAt: serverTimestamp(),
   });
 
@@ -383,4 +431,43 @@ export async function toggleLike(postId, userId) {
     });
     return false;
   }
+}
+
+/**
+ * Delete a post and its likes/replies subcollections
+ */
+export async function deletePostWithChildren(postId) {
+  if (!postId) return;
+  const postRef = doc(db, POSTS_COLLECTION, postId);
+
+  const deleteDocsInBatches = async (docs) => {
+    let batch = writeBatch(db);
+    let count = 0;
+
+    for (const snap of docs) {
+      batch.delete(snap.ref);
+      count += 1;
+      if (count >= 450) {
+        await batch.commit();
+        batch = writeBatch(db);
+        count = 0;
+      }
+    }
+
+    if (count > 0) {
+      await batch.commit();
+    }
+  };
+
+  const repliesRef = collection(db, POSTS_COLLECTION, postId, 'replies');
+  const likesRef = collection(db, POSTS_COLLECTION, postId, 'likes');
+
+  const [repliesSnap, likesSnap] = await Promise.all([
+    getDocs(repliesRef),
+    getDocs(likesRef),
+  ]);
+
+  await deleteDocsInBatches(repliesSnap.docs);
+  await deleteDocsInBatches(likesSnap.docs);
+  await deleteDoc(postRef);
 }

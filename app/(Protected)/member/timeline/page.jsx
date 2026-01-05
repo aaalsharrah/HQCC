@@ -8,10 +8,18 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Heart,
   MessageCircle,
-  Share2,
-  Bookmark,
   ImageIcon,
   Send,
   X,
@@ -29,12 +37,13 @@ import {
 import { auth, storage, db } from '@/app/lib/firebase/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { doc, updateDoc } from 'firebase/firestore';
 
 import {
   createPost,
   subscribeToPosts,
   toggleLike,
+  deletePostWithChildren,
 } from '@/app/lib/firebase/post';
 
 export default function FeedPage() {
@@ -88,15 +97,6 @@ export default function FeedPage() {
     }
   };
 
-  const handleBookmark = (postId) => {
-    setPosts((prev) =>
-      prev.map((post) =>
-        post.id === postId
-          ? { ...post, isBookmarked: !post.isBookmarked }
-          : post
-      )
-    );
-  };
 
   // Subscribe to posts on mount
   useEffect(() => {
@@ -224,6 +224,7 @@ export default function FeedPage() {
     const [draftContent, setDraftContent] = useState(post.content || '');
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
     const isOwnPost =
       currentUser && post.authorId && post.authorId === currentUser.uid;
@@ -262,15 +263,9 @@ export default function FeedPage() {
     };
 
     const handleDeleteClick = async () => {
-      const ok = window.confirm(
-        'Delete this post? This action cannot be undone.'
-      );
-      if (!ok) return;
-
       try {
         setDeleting(true);
-        const postRef = doc(db, 'posts', post.id);
-        await deleteDoc(postRef);
+        await deletePostWithChildren(post.id);
 
         handlePostDeletedLocally(post.id);
       } catch (err) {
@@ -286,9 +281,7 @@ export default function FeedPage() {
         {/* Post header */}
         <div className="flex items-start gap-4 mb-4">
           <Avatar className="h-12 w-12 ring-2 ring-primary/20">
-            <AvatarImage
-              src={post.authorAvatar || '/diverse-user-avatars.png'}
-            />
+            <AvatarImage src={post.authorAvatar || '/placeholder.svg'} />
             <AvatarFallback>
               {post.authorName ? post.authorName.slice(0, 2) : 'HQ'}
             </AvatarFallback>
@@ -332,7 +325,7 @@ export default function FeedPage() {
                       Edit
                     </DropdownMenuItem>
                     <DropdownMenuItem
-                      onClick={handleDeleteClick}
+                      onClick={() => setShowDeleteDialog(true)}
                       className="text-destructive focus:text-destructive"
                       disabled={deleting}
                     >
@@ -344,6 +337,30 @@ export default function FeedPage() {
             </div>
           </div>
         </div>
+
+        <AlertDialog
+          open={showDeleteDialog}
+          onOpenChange={(open) => setShowDeleteDialog(open)}
+        >
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete this post?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={handleDeleteClick}
+                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                disabled={deleting}
+              >
+                {deleting ? 'Deleting...' : 'Confirm'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* Post content (or editor) */}
         {isEditing ? (
@@ -421,33 +438,6 @@ export default function FeedPage() {
               View thread & reply
             </Link>
           </div>
-
-          <div className="flex items-center gap-1">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-2 text-muted-foreground hover:text-primary"
-            >
-              <Share2 className="h-5 w-5" />
-            </Button>
-
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleBookmark(post.id)}
-              className={`${
-                post.isBookmarked
-                  ? 'text-accent hover:text-accent/80'
-                  : 'text-muted-foreground hover:text-accent'
-              }`}
-            >
-              <Bookmark
-                className={`h-5 w-5 ${
-                  post.isBookmarked ? 'fill-current' : ''
-                }`}
-              />
-            </Button>
-          </div>
         </div>
       </Card>
     );
@@ -479,7 +469,7 @@ export default function FeedPage() {
         <Card className="p-6 mb-6 bg-card/50 backdrop-blur-xl border-border/50">
           <div className="flex gap-4">
             <Avatar className="h-12 w-12 ring-2 ring-primary/20">
-              <AvatarImage src={currentUser?.photoURL || '/images.jpeg'} />
+            <AvatarImage src={currentUser?.photoURL || '/placeholder.svg'} />
               <AvatarFallback>
                 {currentUser?.displayName
                   ? currentUser.displayName.slice(0, 2)

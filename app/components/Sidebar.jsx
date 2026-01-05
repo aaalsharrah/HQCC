@@ -39,6 +39,7 @@ export default function Sidebar({ collapsed, onToggle }) {
 
   const [currentUser, setCurrentUser] = useState(null);
   const [role, setRole] = useState(null);
+  const [memberAvatar, setMemberAvatar] = useState(null);
 
   // Fetch auth + role
   useEffect(() => {
@@ -47,6 +48,7 @@ export default function Sidebar({ collapsed, onToggle }) {
 
       if (!user) {
         setRole(null);
+        setMemberAvatar(null);
         return;
       }
 
@@ -54,13 +56,17 @@ export default function Sidebar({ collapsed, onToggle }) {
         const ref = doc(db, 'members', user.uid);
         const snap = await getDoc(ref);
         if (snap.exists()) {
-          setRole(snap.data().role || null);
+          const data = snap.data();
+          setRole(data.role || null);
+          setMemberAvatar(data.avatar || user.photoURL || null);
         } else {
           setRole(null);
+          setMemberAvatar(user.photoURL || null);
         }
       } catch (err) {
         console.error(err);
         setRole(null);
+        setMemberAvatar(user.photoURL || null);
       }
     });
 
@@ -87,7 +93,7 @@ export default function Sidebar({ collapsed, onToggle }) {
       ?.toLowerCase()
       ?.replace(/[^a-z0-9]/g, '') || 'member';
 
-  const avatarUrl = currentUser?.photoURL || '/quantum-computing-student.jpg';
+  const avatarUrl = memberAvatar || '/placeholder.svg';
 
   const navItems = [
     ...baseNavItems,

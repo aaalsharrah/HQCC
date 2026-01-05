@@ -191,7 +191,7 @@ export default function SettingsPage() {
             bio: 'HQCC member | Quantum & Computing Enthusiast',
             location: 'Hempstead, NY',
             website: 'hqcc.hofstra.edu',
-            avatar: user.photoURL || '/quantum-computing-student.jpg',
+            avatar: user.photoURL || '/placeholder.svg',
             createdAt: serverTimestamp(),
 
             role: 'member',

@@ -7,7 +7,17 @@ import { useRouter, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Heart, MessageCircle, ArrowLeft } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { Heart, MessageCircle, ArrowLeft, Trash2 } from 'lucide-react';
 
 import { auth } from '@/app/lib/firebase/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -18,6 +28,8 @@ import {
   createReply,
   toggleLike,
 } from '@/app/lib/firebase/post';
+import { deleteDoc, doc } from 'firebase/firestore';
+import { db } from '@/app/lib/firebase/firebase';
 
 export default function PostThreadPage() {
   const router = useRouter();
@@ -30,6 +42,8 @@ export default function PostThreadPage() {
   const [loading, setLoading] = useState(true);
   const [replyText, setReplyText] = useState('');
   const [postingReply, setPostingReply] = useState(false);
+  const [deletingReplyId, setDeletingReplyId] = useState(null);
+  const [confirmDeleteReplyId, setConfirmDeleteReplyId] = useState(null);
 
   // 🔹 Listen to auth & enforce sign-in
   useEffect(() => {
@@ -131,6 +145,24 @@ export default function PostThreadPage() {
     }
   };
 
+  const handleDeleteReply = async (replyId) => {
+    if (!currentUser) {
+      alert('You must be logged in to delete replies.');
+      return;
+    }
+
+    try {
+      setDeletingReplyId(replyId);
+      const replyRef = doc(db, 'posts', id, 'replies', replyId);
+      await deleteDoc(replyRef);
+    } catch (err) {
+      console.error('Error deleting reply:', err);
+      alert('Failed to delete reply. Please try again.');
+    } finally {
+      setDeletingReplyId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background pt-24 px-4">
@@ -177,9 +209,7 @@ export default function PostThreadPage() {
         <Card className="p-6 bg-card/60 backdrop-blur-xl border-border/60">
           <div className="flex items-start gap-4 mb-4">
             <Avatar className="h-12 w-12 ring-2 ring-primary/20">
-              <AvatarImage
-                src={post.authorAvatar || '/diverse-user-avatars.png'}
-              />
+              <AvatarImage src={post.authorAvatar || '/placeholder.svg'} />
               <AvatarFallback>
                 {post.authorName ? post.authorName.slice(0, 2) : 'HQ'}
               </AvatarFallback>
@@ -233,9 +263,7 @@ export default function PostThreadPage() {
         <Card className="p-4 bg-card/60 border-border/60">
           <div className="flex gap-3">
             <Avatar className="h-10 w-10 ring-2 ring-primary/20">
-              <AvatarImage
-                src={currentUser?.photoURL || '/diverse-user-avatars.png'}
-              />
+              <AvatarImage src={currentUser?.photoURL || '/placeholder.svg'} />
               <AvatarFallback>
                 {currentUser?.displayName
                   ? currentUser.displayName.slice(0, 2)
@@ -277,9 +305,7 @@ export default function PostThreadPage() {
               <Card key={reply.id} className="p-4 bg-card/40 border-border/50">
                 <div className="flex items-start gap-3">
                   <Avatar className="h-9 w-9 ring-2 ring-primary/10">
-                    <AvatarImage
-                      src={reply.authorAvatar || '/diverse-user-avatars.png'}
-                    />
+                    <AvatarImage src={reply.authorAvatar || '/placeholder.svg'} />
                     <AvatarFallback>
                       {reply.authorName ? reply.authorName.slice(0, 2) : 'HQ'}
                     </AvatarFallback>
@@ -300,12 +326,56 @@ export default function PostThreadPage() {
                     </div>
                     <p className="text-sm text-foreground">{reply.content}</p>
                   </div>
+                  {reply.authorId === currentUser?.uid && (
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={() => setConfirmDeleteReplyId(reply.id)}
+                      disabled={deletingReplyId === reply.id}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </Card>
             ))
           )}
         </div>
       </main>
+
+      <AlertDialog
+        open={!!confirmDeleteReplyId}
+        onOpenChange={(open) => {
+          if (!open) setConfirmDeleteReplyId(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this reply?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!deletingReplyId}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmDeleteReplyId) {
+                  handleDeleteReply(confirmDeleteReplyId);
+                  setConfirmDeleteReplyId(null);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={!!deletingReplyId}
+            >
+              {deletingReplyId ? 'Deleting...' : 'Confirm'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

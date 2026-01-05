@@ -5,12 +5,16 @@ import { useCallback, useState } from 'react';
 import { db } from '@/app/lib/firebase/firebase';
 import {
   collection,
+  collectionGroup,
   getDocs,
   doc,
   Timestamp,
   addDoc,
   updateDoc,
   deleteDoc,
+  query,
+  where,
+  writeBatch,
 } from 'firebase/firestore';
 
 import { createNotification } from '@/app/lib/firebase/notifications';
@@ -88,11 +92,13 @@ export default function useAdminDashboardData({ user, onEditStart }) {
 
       const membersRef = collection(db, 'members');
       const membersSnapshot = await getDocs(membersRef);
-      const membersData = membersSnapshot.docs.map((d) => ({
+      const membersData = membersSnapshot.docs
+        .map((d) => ({
         id: d.id,
         uid: d.id,
         ...d.data(),
-      }));
+        }))
+        .filter((m) => !m.deleted);
 
       const postsRef = collection(db, 'posts');
       const postsSnapshot = await getDocs(postsRef);
@@ -318,17 +324,9 @@ export default function useAdminDashboardData({ user, onEditStart }) {
       const processedEvents = eventsData.map((event) => {
         const eventDate = parseEventDate(event.date);
 
-        const attendeesFromDoc =
-          typeof event.attendees === 'number'
-            ? event.attendees
-            : typeof event.attendeeCount === 'number'
-            ? event.attendeeCount
-            : null;
-
-        const attendees =
-          attendeesFromDoc !== null
-            ? attendeesFromDoc
-            : allRegistrations.filter((r) => r.eventId === event.id).length;
+        const attendees = allRegistrations.filter(
+          (r) => r.eventId === event.id
+        ).length;
 
         let dateDisplay = '';
         if (eventDate) {
@@ -460,6 +458,96 @@ export default function useAdminDashboardData({ user, onEditStart }) {
         alert('Failed to update role. Please try again.');
       } finally {
         setUpdatingRoleId(null);
+      }
+    },
+    [user?.uid]
+  );
+
+  const handleDeleteUser = useCallback(
+    async (memberId) => {
+      if (!memberId) return;
+      if (memberId === user?.uid) {
+        alert("You can't delete your own account here.");
+        return;
+      }
+
+      try {
+        const deleteDocsInBatches = async (docs) => {
+          let batch = writeBatch(db);
+          let count = 0;
+
+          for (const snap of docs) {
+            batch.delete(snap.ref);
+            count += 1;
+            if (count >= 450) {
+              await batch.commit();
+              batch = writeBatch(db);
+              count = 0;
+            }
+          }
+
+          if (count > 0) {
+            await batch.commit();
+          }
+        };
+
+        // Remove registrations by user (events subcollection + legacy top-level)
+        const registrationsSnap = await getDocs(
+          query(
+            collectionGroup(db, 'registrations'),
+            where('userId', '==', memberId)
+          )
+        );
+        await deleteDocsInBatches(registrationsSnap.docs);
+
+        // Remove user from attendeesList across events
+        const eventsSnap = await getDocs(collection(db, 'events'));
+        for (const eventDoc of eventsSnap.docs) {
+          const data = eventDoc.data();
+          if (!Array.isArray(data.attendeesList)) continue;
+          const nextList = data.attendeesList.filter(
+            (att) => att?.userId !== memberId
+          );
+          if (nextList.length !== data.attendeesList.length) {
+            await updateDoc(eventDoc.ref, { attendeesList: nextList });
+          }
+        }
+
+        // Mark posts/replies as deleted user (keep content)
+        const postsSnap = await getDocs(
+          query(collection(db, 'posts'), where('authorId', '==', memberId))
+        );
+        for (const postDoc of postsSnap.docs) {
+          await updateDoc(postDoc.ref, {
+            authorName: 'User deleted',
+            authorEmail: '',
+            authorAvatar: null,
+          });
+        }
+
+        const repliesSnap = await getDocs(
+          query(collectionGroup(db, 'replies'), where('authorId', '==', memberId))
+        );
+        for (const replyDoc of repliesSnap.docs) {
+          await updateDoc(replyDoc.ref, {
+            authorName: 'User deleted',
+            authorEmail: '',
+            authorAvatar: null,
+          });
+        }
+
+        // Mark member as deleted (keep doc for display)
+        await updateDoc(doc(db, 'members', memberId), {
+          deleted: true,
+          name: 'User deleted',
+          email: '',
+          avatar: null,
+          deletedAt: Timestamp.now(),
+        });
+        setUsers((prev) => prev.filter((u) => u.id !== memberId));
+      } catch (err) {
+        console.error('Failed to delete user:', err);
+        alert('Failed to delete user. Please try again.');
       }
     },
     [user?.uid]
@@ -604,17 +692,9 @@ export default function useAdminDashboardData({ user, onEditStart }) {
       const processedEvents = eventsData.map((event) => {
         const eventDate = parseEventDate(event.date);
 
-        const attendeesFromDoc =
-          typeof event.attendees === 'number'
-            ? event.attendees
-            : typeof event.attendeeCount === 'number'
-            ? event.attendeeCount
-            : null;
-
-        const attendees =
-          attendeesFromDoc !== null
-            ? attendeesFromDoc
-            : allRegistrations.filter((r) => r.eventId === event.id).length;
+        const attendees = allRegistrations.filter(
+          (r) => r.eventId === event.id
+        ).length;
 
         let dateDisplay = '';
         if (eventDate) {
@@ -673,6 +753,7 @@ export default function useAdminDashboardData({ user, onEditStart }) {
     handleRoleChange,
     handleCreateEvent,
     handleDeleteEvent,
+    handleDeleteUser,
     startEditingEvent,
     resetForm,
   };
