@@ -52,7 +52,7 @@ env:
       - RUNTIME
 
   - variable: RESEND_API_KEY
-    value: 're_3ybXTs3M_3LsjyNMmEu8GmW9aBq5zvpkA'
+    secret: 're_3ybXTs3M_3LsjyNMmEu8GmW9aBq5zvpkA'
     availability:
       - RUNTIME
 
