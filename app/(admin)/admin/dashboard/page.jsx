@@ -29,10 +29,12 @@ export default function AdminDashboard() {
     users,
     loading,
     form,
+    eventImagePreview,
     editingEventId,
     updatingRoleId,
     fetchData,
     handleFormChange,
+    handleEventImageSelect,
     handleRoleChange,
     handleCreateEvent,
     handleDeleteEvent,
@@ -145,6 +147,8 @@ export default function AdminDashboard() {
               editingEventId={editingEventId}
               form={form}
               onFormChange={handleFormChange}
+              eventImagePreview={eventImagePreview}
+              onEventImageSelect={handleEventImageSelect}
               onCreateEvent={handleCreateEvent}
               onResetForm={resetForm}
               onStartEditingEvent={startEditingEvent}

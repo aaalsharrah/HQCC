@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from 'react';
 
-import { db } from '@/app/lib/firebase/firebase';
+import { db, storage } from '@/app/lib/firebase/firebase';
 import {
   collection,
   collectionGroup,
@@ -16,6 +16,7 @@ import {
   where,
   writeBatch,
 } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 import { createNotification } from '@/app/lib/firebase/notifications';
 
@@ -55,6 +56,8 @@ export default function useAdminDashboardData({ user, onEditStart }) {
   const [editingEventId, setEditingEventId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [updatingRoleId, setUpdatingRoleId] = useState(null);
+  const [eventImageFile, setEventImageFile] = useState(null);
+  const [eventImagePreview, setEventImagePreview] = useState('');
 
   const formatDate = (timestamp) => {
     if (!timestamp) return 'N/A';
@@ -386,6 +389,31 @@ export default function useAdminDashboardData({ user, onEditStart }) {
     []
   );
 
+  const handleEventImageSelect = useCallback((file) => {
+    if (!file) {
+      setEventImageFile(null);
+      setEventImagePreview('');
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file.');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Image size must be less than 10MB.');
+      return;
+    }
+
+    setEventImageFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setEventImagePreview(reader.result || '');
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
   const startEditingEvent = useCallback(
     (event) => {
       setEditingEventId(event.id);
@@ -421,6 +449,8 @@ export default function useAdminDashboardData({ user, onEditStart }) {
   const resetForm = useCallback(() => {
     setEditingEventId(null);
     setForm(emptyForm);
+    setEventImageFile(null);
+    setEventImagePreview('');
   }, []);
 
   const handleDeleteEvent = useCallback(async (eventId, title) => {
@@ -560,6 +590,17 @@ export default function useAdminDashboardData({ user, onEditStart }) {
     }
 
     try {
+      let imageUrl = form.image || '';
+
+      if (eventImageFile) {
+        const imageRef = ref(
+          storage,
+          `events/${Date.now()}_${eventImageFile.name}`
+        );
+        await uploadBytes(imageRef, eventImageFile);
+        imageUrl = await getDownloadURL(imageRef);
+      }
+
       const agenda =
         form.agendaText
           .split('\n')
@@ -610,7 +651,7 @@ export default function useAdminDashboardData({ user, onEditStart }) {
         location: form.location,
         category: form.category || 'Event',
         description: form.description,
-        image: form.image || '/placeholder.svg',
+        image: imageUrl || '/placeholder.svg',
         spots: Number(form.spots) || 0,
         organizer: {
           name: form.organizerName || 'HQCC Team',
@@ -738,7 +779,7 @@ export default function useAdminDashboardData({ user, onEditStart }) {
       console.error('Error creating/updating event:', error);
       alert('Failed to save event. Please try again.');
     }
-  }, [editingEventId, form, resetForm, user?.uid]);
+  }, [editingEventId, eventImageFile, form, resetForm, user?.uid]);
 
   return {
     analytics,
@@ -746,10 +787,12 @@ export default function useAdminDashboardData({ user, onEditStart }) {
     users,
     loading,
     form,
+    eventImagePreview,
     editingEventId,
     updatingRoleId,
     fetchData,
     handleFormChange,
+    handleEventImageSelect,
     handleRoleChange,
     handleCreateEvent,
     handleDeleteEvent,

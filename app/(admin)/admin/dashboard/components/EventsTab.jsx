@@ -15,6 +15,8 @@ export default function EventsTab({
   editingEventId,
   form,
   onFormChange,
+  eventImagePreview,
+  onEventImageSelect,
   onCreateEvent,
   onResetForm,
   onStartEditingEvent,
@@ -91,8 +93,24 @@ export default function EventsTab({
 
           <div className="md:col-span-2">
             <label className="text-sm font-medium mb-1 block">
-              Event Image URL
+              Event Image
             </label>
+            <Input
+              type="file"
+              accept="image/*"
+              className="bg-background/50 border-border"
+              onChange={(e) => onEventImageSelect(e.target.files?.[0])}
+            />
+            {eventImagePreview ? (
+              <img
+                src={eventImagePreview}
+                alt="Event preview"
+                className="mt-3 h-32 w-full max-w-md rounded-lg object-cover border border-border"
+              />
+            ) : null}
+            <p className="text-xs text-muted-foreground mt-2">
+              Or paste an image URL below (optional)
+            </p>
             <Input
               placeholder="/quantum-computing-workshop.jpg"
               className="bg-background/50 border-border"

@@ -87,7 +87,12 @@ service cloud.firestore {
       allow update: if request.auth != null 
         && resource.data.userId == request.auth.uid;
       allow delete: if request.auth != null 
-        && (resource.data.userId == request.auth.uid || isAdmin());
+        && (resource.data.userId == request.auth.uid
+          || isAdmin()
+          || (
+            resource.data.postId != null
+            && get(/databases/$(database)/documents/posts/$(resource.data.postId)).data.authorId == request.auth.uid
+          ));
     }
     
     // Events collection

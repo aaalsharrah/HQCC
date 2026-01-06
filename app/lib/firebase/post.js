@@ -14,6 +14,7 @@ import {
   getDoc,
   getDocs,
   writeBatch,
+  where,
 } from 'firebase/firestore';
 import { db } from '@/app/lib/firebase/firebase';
 import { createNotification } from './notifications';
@@ -461,13 +462,16 @@ export async function deletePostWithChildren(postId) {
 
   const repliesRef = collection(db, POSTS_COLLECTION, postId, 'replies');
   const likesRef = collection(db, POSTS_COLLECTION, postId, 'likes');
+  const notificationsRef = collection(db, 'notifications');
 
-  const [repliesSnap, likesSnap] = await Promise.all([
+  const [repliesSnap, likesSnap, notificationsSnap] = await Promise.all([
     getDocs(repliesRef),
     getDocs(likesRef),
+    getDocs(query(notificationsRef, where('postId', '==', postId))),
   ]);
 
   await deleteDocsInBatches(repliesSnap.docs);
   await deleteDocsInBatches(likesSnap.docs);
+  await deleteDocsInBatches(notificationsSnap.docs);
   await deleteDoc(postRef);
 }
