@@ -3,7 +3,8 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Input } from '@/components/ui/input';
-import { Search, Send, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Search, Send, Loader2, Trash2 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { auth } from '@/app/lib/firebase/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -11,7 +12,19 @@ import {
   subscribeToConversations,
   getOtherUser,
   formatTimestamp,
+  hideConversationForUser,
 } from '@/app/lib/firebase/messages';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 export default function MessagesPage() {
   const router = useRouter();
@@ -19,6 +32,7 @@ export default function MessagesPage() {
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   // Filter conversations based on search query
   const filteredConversations = conversations.filter((conv) => {
@@ -103,6 +117,19 @@ export default function MessagesPage() {
     };
   }, []);
 
+  const handleDeleteConversation = async (conversationId) => {
+    if (!currentUser) return;
+    try {
+      setDeletingId(conversationId);
+      await hideConversationForUser(conversationId, currentUser.uid);
+    } catch (error) {
+      console.error('Error deleting conversation:', error);
+      alert('Failed to delete chat. Please try again.');
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <div className="pt-20 h-screen flex">
@@ -146,10 +173,17 @@ export default function MessagesPage() {
               </div>
             ) : (
               filteredConversations.map((conv) => (
-                <button
+                <div
                   key={conv.id}
                   onClick={() => router.push(`/member/messages/${conv.id}`)}
-                  className="w-full p-4 flex items-start gap-3 hover:bg-primary/5 transition-colors border-b border-border/50"
+                  className="w-full p-4 flex items-start gap-3 hover:bg-primary/5 transition-colors border-b border-border/50 cursor-pointer"
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      router.push(`/member/messages/${conv.id}`);
+                    }
+                  }}
                 >
                   <Avatar className="h-12 w-12">
                     <AvatarImage src={conv.avatar || '/placeholder.svg'} />
@@ -175,7 +209,41 @@ export default function MessagesPage() {
                       {conv.lastMessage || 'No messages yet'}
                     </p>
                   </div>
-                </button>
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={(e) => e.stopPropagation()}
+                        className="shrink-0 text-muted-foreground hover:text-destructive"
+                        aria-label="Delete chat"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete chat?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will remove the conversation from your messages
+                          only. The other person will still see it.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          disabled={deletingId === conv.id}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteConversation(conv.id);
+                          }}
+                        >
+                          {deletingId === conv.id ? 'Deleting...' : 'Delete'}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               ))
             )}
           </div>

@@ -8,6 +8,8 @@ import {
   addDoc,
   updateDoc,
   deleteDoc,
+  arrayUnion,
+  arrayRemove,
   query,
   where,
   orderBy,
@@ -39,14 +41,18 @@ export function subscribeToConversations(userId, callback) {
         ...doc.data(),
       }));
       
+      const visibleConversations = conversations.filter(
+        (conv) => !conv.deletedFor?.includes?.(userId)
+      );
+
       // Sort client-side by lastMessageTime (most recent first)
-      conversations.sort((a, b) => {
+      visibleConversations.sort((a, b) => {
         const aTime = a.lastMessageTime?.toMillis?.() || a.lastMessageTime?.seconds || 0;
         const bTime = b.lastMessageTime?.toMillis?.() || b.lastMessageTime?.seconds || 0;
         return bTime - aTime; // Descending order
       });
       
-      callback(conversations);
+      callback(visibleConversations);
     },
     (error) => {
       console.error('Error subscribing to conversations:', error);
@@ -115,15 +121,9 @@ export async function sendMessage(conversationId, messageText) {
     timestamp: serverTimestamp(),
   });
 
-  // Update conversation with last message
-  const conversationRef = doc(db, 'conversations', conversationId);
-  await updateDoc(conversationRef, {
-    lastMessage: messageText.trim(),
-    lastMessageTime: serverTimestamp(),
-  });
-
-  // Create notification for recipient
+  // Update conversation and create notification for recipient
   try {
+    const conversationRef = doc(db, 'conversations', conversationId);
     const conversationSnap = await getDoc(conversationRef);
     if (conversationSnap.exists()) {
       const conversationData = conversationSnap.data();
@@ -131,6 +131,16 @@ export async function sendMessage(conversationId, messageText) {
       
       // Find the other participant (recipient)
       const recipientId = participants.find((id) => id !== currentUser.uid);
+      const removeIds = [currentUser.uid];
+      if (recipientId) {
+        removeIds.push(recipientId);
+      }
+
+      await updateDoc(conversationRef, {
+        lastMessage: messageText.trim(),
+        lastMessageTime: serverTimestamp(),
+        deletedFor: arrayRemove(...removeIds),
+      });
       
       if (recipientId) {
         // Get sender (actor) details from members collection
@@ -327,7 +337,20 @@ export async function findOrCreateConversation(userId1, userId2) {
 }
 
 /**
- * Delete a conversation
+ * Hide a conversation for a user (other participant still sees it)
+ * @param {string} conversationId - Conversation ID
+ * @param {string} userId - Current user ID
+ * @returns {Promise<void>}
+ */
+export async function hideConversationForUser(conversationId, userId) {
+  const conversationRef = doc(db, 'conversations', conversationId);
+  await updateDoc(conversationRef, {
+    deletedFor: arrayUnion(userId),
+  });
+}
+
+/**
+ * Delete a conversation (removes it for all participants)
  * @param {string} conversationId - Conversation ID
  * @returns {Promise<void>}
  */
