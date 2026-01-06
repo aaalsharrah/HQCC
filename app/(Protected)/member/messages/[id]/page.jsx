@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ArrowLeft, Send, Loader2, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Send, Loader2, CheckCircle2, Check } from 'lucide-react';
 import { auth, db } from '@/app/lib/firebase/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import {
@@ -14,7 +14,7 @@ import {
   formatTimestamp,
   deleteConversation,
 } from '@/app/lib/firebase/messages';
-import { doc, getDoc, deleteDoc } from 'firebase/firestore';
+import { doc, getDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 export default function MessageDetailPage() {
@@ -32,6 +32,8 @@ export default function MessageDetailPage() {
   const [sending, setSending] = useState(false);
   const [otherUser, setOtherUser] = useState(null);
   const [conversationData, setConversationData] = useState(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedMessageIds, setSelectedMessageIds] = useState([]);
 
   // Auto-scroll when messages change
   useEffect(() => {
@@ -42,6 +44,17 @@ export default function MessageDetailPage() {
       });
     }
   }, [messages]);
+
+  useEffect(() => {
+    setSelectedMessageIds((prev) =>
+      prev.filter((id) =>
+        messages.some(
+          (message) =>
+            message.id === id && message.senderId === currentUser?.uid
+        )
+      )
+    );
+  }, [messages, currentUser]);
 
   useEffect(() => {
     let unsubscribeMessages = null;
@@ -173,6 +186,49 @@ export default function MessageDetailPage() {
     }
   };
 
+  const handleToggleSelectionMode = () => {
+    setSelectionMode((prev) => {
+      if (prev) {
+        setSelectedMessageIds([]);
+      }
+      return !prev;
+    });
+  };
+
+  const handleToggleMessageSelection = (messageId) => {
+    setSelectedMessageIds((prev) =>
+      prev.includes(messageId)
+        ? prev.filter((id) => id !== messageId)
+        : [...prev, messageId]
+    );
+  };
+
+  const handleDeleteSelected = async () => {
+    if (!conversationId || !currentUser || selectedMessageIds.length === 0) {
+      return;
+    }
+
+    try {
+      const batch = writeBatch(db);
+      selectedMessageIds.forEach((messageId) => {
+        const messageRef = doc(
+          db,
+          'conversations',
+          conversationId,
+          'messages',
+          messageId
+        );
+        batch.delete(messageRef);
+      });
+      await batch.commit();
+      setSelectedMessageIds([]);
+      setSelectionMode(false);
+    } catch (error) {
+      console.error('Error deleting messages:', error);
+      alert('Failed to delete messages. Please try again.');
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
@@ -197,6 +253,8 @@ export default function MessageDetailPage() {
   const isSeller =
     conversationData.sellerId === currentUser?.uid ||
     conversationData.sellerId === currentUser?.id;
+
+  const selectedCount = selectedMessageIds.length;
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
@@ -225,6 +283,25 @@ export default function MessageDetailPage() {
               </p>
             )}
           </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleToggleSelectionMode}
+            >
+              {selectionMode ? 'Cancel' : 'Select'}
+            </Button>
+            {selectionMode && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleDeleteSelected}
+                disabled={selectedCount === 0}
+              >
+                Delete{selectedCount > 0 ? ` (${selectedCount})` : ''}
+              </Button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -240,11 +317,35 @@ export default function MessageDetailPage() {
         ) : (
           messages.map((msg) => {
             const isMe = msg.senderId === currentUser?.uid;
+            const isSelected = selectedMessageIds.includes(msg.id);
             return (
               <div
                 key={msg.id}
-                className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}
+                className={`flex ${
+                  isMe ? 'justify-end' : 'justify-start'
+                } items-start gap-2`}
               >
+                {selectionMode && (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      isMe ? handleToggleMessageSelection(msg.id) : null
+                    }
+                    disabled={!isMe}
+                    className={`mt-2 h-5 w-5 rounded-md border-2 flex items-center justify-center ${
+                      isSelected
+                        ? 'bg-primary text-primary-foreground border-primary'
+                        : 'bg-white/90 border-border'
+                    } ${
+                      isMe
+                        ? 'hover:border-primary'
+                        : 'opacity-40 cursor-not-allowed'
+                    }`}
+                    aria-label="Select message"
+                  >
+                    {isSelected && <Check className="h-3.5 w-3.5" />}
+                  </button>
+                )}
                 <div
                   className={`max-w-[75%] rounded-2xl px-4 py-2 ${
                     isMe
