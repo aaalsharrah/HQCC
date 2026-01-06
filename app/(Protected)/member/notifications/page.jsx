@@ -5,13 +5,13 @@ import { useRouter } from 'next/navigation';
 
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Settings, CheckCheck, Loader2 } from 'lucide-react';
+import { CheckCheck, Loader2, Trash2 } from 'lucide-react';
 
 import { getNotificationIcon } from './data';
 
 import { auth, db } from '@/app/lib/firebase/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import {
   subscribeToNotifications,
   markAllNotificationsAsRead,
@@ -25,6 +25,8 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState(null);
   const [markingAsRead, setMarkingAsRead] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState([]);
 
   // 🔧 preferences loaded from members/{uid}.notifications
   const [notificationPrefs, setNotificationPrefs] = useState({
@@ -133,6 +135,42 @@ export default function NotificationsPage() {
     }
   };
 
+  const toggleSelectionMode = () => {
+    setSelectionMode((prev) => {
+      const next = !prev;
+      if (!next) {
+        setSelectedIds([]);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelected = (id) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  const deleteSelected = async () => {
+    if (selectedIds.length === 0) return;
+    const ok = window.confirm('Delete selected notifications?');
+    if (!ok) return;
+
+    try {
+      const batch = writeBatch(db);
+      selectedIds.forEach((id) => {
+        const ref = doc(db, 'notifications', id);
+        batch.delete(ref);
+      });
+      await batch.commit();
+      setSelectedIds([]);
+      setSelectionMode(false);
+    } catch (error) {
+      console.error('Failed to delete notifications:', error);
+      alert('Failed to delete notifications. Please try again.');
+    }
+  };
+
   // ✅ Apply user preferences
   const applyPrefs = (n) => {
     // Likes controlled by "Post Likes" toggle
@@ -198,12 +236,24 @@ export default function NotificationsPage() {
                   )}
                   Mark all read
                 </Button>
-
-                <Button variant="outline" size="sm" asChild>
-                  <a href="/settings">
-                    <Settings className="h-4 w-4" />
-                  </a>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={toggleSelectionMode}
+                >
+                  {selectionMode ? 'Cancel' : 'Select'}
                 </Button>
+                {selectionMode && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={deleteSelected}
+                    disabled={selectedIds.length === 0}
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete
+                  </Button>
+                )}
               </div>
             </div>
 
@@ -246,6 +296,17 @@ export default function NotificationsPage() {
                   }`}
                 >
                   <div className="flex gap-4">
+                    {selectionMode && (
+                      <div className="pt-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(notification.id)}
+                          onChange={() => toggleSelected(notification.id)}
+                          className="h-4 w-4 accent-primary"
+                          aria-label="Select notification"
+                        />
+                      </div>
+                    )}
                     {/* ICON */}
                     <div className="shrink-0 mt-1">
                       {getNotificationIcon(notification.type)}
