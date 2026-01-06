@@ -17,7 +17,7 @@ service cloud.firestore {
     
     // Members collection - allow authenticated users to read member profiles
     match /members/{memberId} {
-      allow read: if request.auth != null;
+      allow read: if request.auth != null || resource.data.role == 'admin';
       allow create: if request.auth != null && request.auth.uid == memberId;
       allow update: if request.auth != null && (request.auth.uid == memberId || isAdmin());
       allow delete: if request.auth != null && (request.auth.uid == memberId || isAdmin());

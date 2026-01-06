@@ -1,28 +1,95 @@
 "use client"
 
+import { useEffect, useState } from "react"
 import { Linkedin, Mail } from "lucide-react"
 import { Button } from "@/components/ui/button"
-
-const teamMembers = [
-  {
-    name: "Abdallah Aisharrah",
-    role: "Founder & President",
-    initials: "AA",
-    bio: "Passionate about advancing quantum computing education and research at Hofstra University. Dedicated to building a vibrant community of quantum enthusiasts.",
-    linkedin: "https://www.linkedin.com/",
-    email: "abdallah@example.com",
-  },
-  {
-    name: "Subhan Nadeem",
-    role: "Co-Founder & Vice President",
-    initials: "SN",
-    bio: "Focused on building scalable developer tools, AI-powered platforms, and growing HQCC into a leading quantum & computing community at Hofstra.",
-    linkedin: "https://www.linkedin.com/",
-    email: "subhan@example.com",
-  },
-]
+import { db } from "@/app/lib/firebase/firebase"
+import { collection, getDocs, query, where } from "firebase/firestore"
 
 export function Team() {
+  const [teamMembers, setTeamMembers] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const roleOrder = {
+    president: 1,
+    vice_president: 2,
+    secretary: 3,
+    treasurer: 4,
+    advisor: 5,
+  }
+
+  const prettyRole = (value) => {
+    switch (value) {
+      case "president":
+        return "President"
+      case "vice_president":
+        return "Vice President"
+      case "secretary":
+        return "Secretary"
+      case "treasurer":
+        return "Treasurer"
+      case "advisor":
+        return "Advisor"
+      default:
+        return "Admin"
+    }
+  }
+
+  useEffect(() => {
+    let mounted = true
+
+    async function loadAdmins() {
+      try {
+        const membersRef = collection(db, "members")
+        const q = query(membersRef, where("role", "==", "admin"))
+        const snap = await getDocs(q)
+        const admins = snap.docs
+          .map((docSnap) => {
+            const data = docSnap.data()
+            const name = data.name || "Admin"
+            const initials = name
+              .split(" ")
+              .map((part) => part[0])
+              .join("")
+              .slice(0, 2)
+            return {
+              id: docSnap.id,
+              name,
+              role: prettyRole(data.boardRole),
+              roleKey: data.boardRole || "",
+              initials,
+              bio: data.bio || "",
+              linkedin: data.linkedin || "",
+              email: data.email || "",
+              avatar: data.avatar || "",
+              deleted: !!data.deleted,
+            }
+          })
+          .filter((member) => !member.deleted)
+          .sort((a, b) => {
+            const aOrder = roleOrder[a.roleKey] || 99
+            const bOrder = roleOrder[b.roleKey] || 99
+            if (aOrder !== bOrder) return aOrder - bOrder
+            return a.name.localeCompare(b.name)
+          })
+
+        if (mounted) {
+          setTeamMembers(admins)
+        }
+      } catch (err) {
+        console.error("Failed to load leadership team", err)
+        if (mounted) setTeamMembers([])
+      } finally {
+        if (mounted) setLoading(false)
+      }
+    }
+
+    loadAdmins()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
   return (
     <section
       id="team"
@@ -38,64 +105,82 @@ export function Team() {
           </p>
         </div>
 
-        {/* GRID LAYOUT */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-10 max-w-5xl mx-auto">
-          {teamMembers.map((member) => (
-            <div
-              key={member.name}
-              className="bg-card/50 backdrop-blur-sm border border-border rounded-2xl p-8 hover:bg-card hover:border-primary/50 transition-all duration-300 flex flex-col items-center text-center"
-            >
-              {/* Avatar */}
-              <div className="w-28 h-28 rounded-full bg-linear-to-br from-primary to-accent flex items-center justify-center mb-6">
-                <span className="text-4xl font-bold text-primary-foreground">
-                  {member.initials}
-                </span>
-              </div>
+        {/* HORIZONTAL SCROLL */}
+        {loading ? (
+          <div className="text-center text-muted-foreground">
+            Loading leadership team...
+          </div>
+        ) : teamMembers.length === 0 ? (
+          <div className="text-center text-muted-foreground">
+            No admins found yet.
+          </div>
+        ) : (
+          <div className="flex gap-6 overflow-x-auto pb-6 snap-x snap-mandatory max-w-6xl mx-auto">
+            {teamMembers.map((member) => (
+              <div
+                key={member.id}
+                className="min-w-[260px] max-w-[280px] snap-start bg-card/50 backdrop-blur-sm border border-border rounded-2xl p-8 hover:bg-card hover:border-primary/50 transition-all duration-300 flex flex-col items-center text-center"
+              >
+                {/* Avatar */}
+                {member.avatar ? (
+                  <img
+                    src={member.avatar}
+                    alt={member.name}
+                    className="w-28 h-28 rounded-full object-cover border border-border mb-6"
+                  />
+                ) : (
+                  <div className="w-28 h-28 rounded-full bg-linear-to-br from-primary to-accent flex items-center justify-center mb-6">
+                    <span className="text-4xl font-bold text-primary-foreground">
+                      {member.initials}
+                    </span>
+                  </div>
+                )}
 
-              {/* Name & Role */}
-              <h3 className="text-2xl font-bold text-foreground">{member.name}</h3>
-              <p className="text-primary text-lg mb-3">{member.role}</p>
+                {/* Name & Role */}
+                <h3 className="text-2xl font-bold text-foreground">{member.name}</h3>
+                <p className="text-primary text-lg mb-3">{member.role}</p>
 
-              {/* Bio */}
-              <p className="text-foreground/60 text-sm mb-6 leading-relaxed max-w-xs">
-                {member.bio}
-              </p>
+                {/* Bio */}
+                <p className="text-foreground/60 text-sm mb-6 leading-relaxed max-w-xs">
+                  {member.bio || "HQCC leadership team member."}
+                </p>
 
-              {/* Socials */}
-              <div className="flex gap-3">
-                {member.linkedin && (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="border-primary/30 hover:border-primary hover:bg-primary/10 transition-all bg-transparent"
-                    asChild
-                  >
-                    <a
-                      href={member.linkedin}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      aria-label={`${member.name} LinkedIn`}
+                {/* Socials */}
+                <div className="flex gap-3">
+                  {member.linkedin && (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="border-primary/30 hover:border-primary hover:bg-primary/10 transition-all bg-transparent"
+                      asChild
                     >
-                      <Linkedin className="w-5 h-5 text-primary" />
-                    </a>
-                  </Button>
-                )}
-                {member.email && (
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="border-primary/30 hover:border-primary hover:bg-primary/10 transition-all bg-transparent"
-                    asChild
-                  >
-                    <a href={`mailto:${member.email}`} aria-label={`${member.name} Email`}>
-                      <Mail className="w-5 h-5 text-primary" />
-                    </a>
-                  </Button>
-                )}
+                      <a
+                        href={member.linkedin}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        aria-label={`${member.name} LinkedIn`}
+                      >
+                        <Linkedin className="w-5 h-5 text-primary" />
+                      </a>
+                    </Button>
+                  )}
+                  {member.email && (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="border-primary/30 hover:border-primary hover:bg-primary/10 transition-all bg-transparent"
+                      asChild
+                    >
+                      <a href={`mailto:${member.email}`} aria-label={`${member.name} Email`}>
+                        <Mail className="w-5 h-5 text-primary" />
+                      </a>
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* CTA */}
         <div className="mt-20 text-center">
