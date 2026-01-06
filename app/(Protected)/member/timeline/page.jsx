@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, memo } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 
@@ -46,180 +46,13 @@ import {
   deletePostWithChildren,
 } from '@/app/lib/firebase/post';
 
-export default function FeedPage() {
-  const [posts, setPosts] = useState([]);
-  const [newPost, setNewPost] = useState('');
-  const [currentUser, setCurrentUser] = useState(null);
-  const [loadingPosts, setLoadingPosts] = useState(true);
-  const [posting, setPosting] = useState(false);
-  const [postImage, setPostImage] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
-  const fileInputRef = useRef(null);
-
-  // ---- helpers to keep local posts array in sync when editing/deleting ----
-  const handlePostUpdated = (postId, newContent) => {
-    setPosts((prev) =>
-      prev.map((p) => (p.id === postId ? { ...p, content: newContent } : p))
-    );
-  };
-
-  const handlePostDeletedLocally = (postId) => {
-    setPosts((prev) => prev.filter((p) => p.id !== postId));
-  };
-
-  const handleLike = async (postId) => {
-    if (!currentUser) {
-      alert('You must be logged in to like posts.');
-      return;
-    }
-
-    // Optimistic UI update
-    setPosts((prev) =>
-      prev.map((post) =>
-        post.id === postId
-          ? {
-              ...post,
-              isLiked: !post.isLiked,
-              likesCount: post.isLiked
-                ? Math.max(0, (post.likesCount ?? 0) - 1)
-                : (post.likesCount ?? 0) + 1,
-            }
-          : post
-      )
-    );
-
-    // Firestore toggle (one like per user)
-    try {
-      await toggleLike(postId, currentUser.uid);
-    } catch (e) {
-      console.error('Failed to toggle like', e);
-      // optional: revert UI here if you want
-    }
-  };
-
-
-  // Subscribe to posts on mount
-  useEffect(() => {
-    let unsubscribePosts = null;
-
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      // Clean up previous subscription if it exists
-      if (unsubscribePosts) {
-        unsubscribePosts();
-      }
-
-      if (!user) {
-        setCurrentUser(null);
-        setLoadingPosts(false);
-        setPosts([]);
-        return;
-      }
-
-      setCurrentUser(user);
-
-      // Subscribe to posts with user ID for like status
-      unsubscribePosts = subscribeToPosts((postsData) => {
-        setPosts(postsData);
-        setLoadingPosts(false);
-      }, user.uid);
-    });
-
-    return () => {
-      if (unsubscribePosts) {
-        unsubscribePosts();
-      }
-      unsubscribeAuth();
-    };
-  }, []);
-
-  const handleImageSelect = (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      alert('Please select an image file.');
-      return;
-    }
-
-    // Validate file size (max 10MB)
-    if (file.size > 10 * 1024 * 1024) {
-      alert('Image size must be less than 10MB.');
-      return;
-    }
-
-    setPostImage(file);
-
-    // Create preview
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImagePreview(reader.result);
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleRemoveImage = () => {
-    setPostImage(null);
-    setImagePreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
-
-  const handlePost = async () => {
-    if (!newPost.trim() && !postImage) return;
-    if (!currentUser) {
-      alert('You must be logged in to post.');
-      return;
-    }
-
-    try {
-      setPosting(true);
-
-      let imageUrl = null;
-
-      // Upload image if provided
-      if (postImage) {
-        try {
-          const imageRef = ref(
-            storage,
-            `posts/${Date.now()}_${postImage.name}`
-          );
-          await uploadBytes(imageRef, postImage);
-          imageUrl = await getDownloadURL(imageRef);
-        } catch (uploadError) {
-          console.error('Image upload error:', uploadError);
-          alert('Failed to upload image. Please try again.');
-          setPosting(false);
-          return;
-        }
-      }
-
-      // Create post with image URL if available
-      await createPost({
-        content: newPost.trim(),
-        user: currentUser,
-        imageUrl: imageUrl,
-      });
-
-      // Reset form
-      setNewPost('');
-      setPostImage(null);
-      setImagePreview(null);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-      // subscribeToPosts will pick it up
-    } catch (err) {
-      console.error('Error creating post:', err);
-      alert('Failed to create post. Please try again.');
-    } finally {
-      setPosting(false);
-    }
-  };
-
-  // ---- Single Post card with edit/delete (only for own posts) ----
-  const PostCard = ({ post }) => {
+const PostCard = memo(function PostCard({
+  post,
+  currentUser,
+  onPostUpdated,
+  onPostDeleted,
+  onLike,
+}) {
     const [isEditing, setIsEditing] = useState(false);
     const [draftContent, setDraftContent] = useState(post.content || '');
     const [saving, setSaving] = useState(false);
@@ -252,7 +85,7 @@ export default function FeedPage() {
         await updateDoc(postRef, { content: trimmed });
 
         // local sync
-        handlePostUpdated(post.id, trimmed);
+        onPostUpdated(post.id, trimmed);
         setIsEditing(false);
       } catch (err) {
         console.error('Failed to update post', err);
@@ -267,7 +100,7 @@ export default function FeedPage() {
         setDeleting(true);
         await deletePostWithChildren(post.id);
 
-        handlePostDeletedLocally(post.id);
+        onPostDeleted(post.id);
       } catch (err) {
         console.error('Failed to delete post', err);
         alert('Failed to delete post. Please try again.');
@@ -417,7 +250,7 @@ export default function FeedPage() {
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => handleLike(post.id)}
+              onClick={() => onLike(post.id)}
               className={`gap-2 ${
                 post.isLiked
                   ? 'text-red-500 hover:text-red-600'
@@ -441,6 +274,178 @@ export default function FeedPage() {
         </div>
       </Card>
     );
+  }
+);
+
+export default function FeedPage() {
+  const [posts, setPosts] = useState([]);
+  const [newPost, setNewPost] = useState('');
+  const [currentUser, setCurrentUser] = useState(null);
+  const [loadingPosts, setLoadingPosts] = useState(true);
+  const [posting, setPosting] = useState(false);
+  const [postImage, setPostImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState(null);
+  const fileInputRef = useRef(null);
+
+  // ---- helpers to keep local posts array in sync when editing/deleting ----
+  const handlePostUpdated = (postId, newContent) => {
+    setPosts((prev) =>
+      prev.map((p) => (p.id === postId ? { ...p, content: newContent } : p))
+    );
+  };
+
+  const handlePostDeletedLocally = (postId) => {
+    setPosts((prev) => prev.filter((p) => p.id !== postId));
+  };
+
+  const handleLike = async (postId) => {
+    if (!currentUser) {
+      alert('You must be logged in to like posts.');
+      return;
+    }
+
+    // Optimistic UI update
+    setPosts((prev) =>
+      prev.map((post) =>
+        post.id === postId
+          ? {
+              ...post,
+              isLiked: !post.isLiked,
+              likesCount: post.isLiked
+                ? Math.max(0, (post.likesCount ?? 0) - 1)
+                : (post.likesCount ?? 0) + 1,
+            }
+          : post
+      )
+    );
+
+    // Firestore toggle (one like per user)
+    try {
+      await toggleLike(postId, currentUser.uid);
+    } catch (e) {
+      console.error('Failed to toggle like', e);
+      // optional: revert UI here if you want
+    }
+  };
+
+  // Subscribe to posts on mount
+  useEffect(() => {
+    let unsubscribePosts = null;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      // Clean up previous subscription if it exists
+      if (unsubscribePosts) {
+        unsubscribePosts();
+      }
+
+      if (!user) {
+        setCurrentUser(null);
+        setLoadingPosts(false);
+        setPosts([]);
+        return;
+      }
+
+      setCurrentUser(user);
+
+      // Subscribe to posts with user ID for like status
+      unsubscribePosts = subscribeToPosts((postsData) => {
+        setPosts(postsData);
+        setLoadingPosts(false);
+      }, user.uid);
+    });
+
+    return () => {
+      if (unsubscribePosts) {
+        unsubscribePosts();
+      }
+      unsubscribeAuth();
+    };
+  }, []);
+
+  const handleImageSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file.');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('Image size must be less than 10MB.');
+      return;
+    }
+
+    setPostImage(file);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveImage = () => {
+    setPostImage(null);
+    setImagePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handlePost = async () => {
+    if (!newPost.trim() && !postImage) return;
+    if (!currentUser) {
+      alert('You must be logged in to post.');
+      return;
+    }
+
+    try {
+      setPosting(true);
+
+      let imageUrl = null;
+
+      // Upload image if provided
+      if (postImage) {
+        try {
+          const imageRef = ref(
+            storage,
+            `posts/${Date.now()}_${postImage.name}`
+          );
+          await uploadBytes(imageRef, postImage);
+          imageUrl = await getDownloadURL(imageRef);
+        } catch (uploadError) {
+          console.error('Image upload error:', uploadError);
+          alert('Failed to upload image. Please try again.');
+          setPosting(false);
+          return;
+        }
+      }
+
+      // Create post with image URL if available
+      await createPost({
+        content: newPost.trim(),
+        user: currentUser,
+        imageUrl: imageUrl,
+      });
+
+      // Reset form
+      setNewPost('');
+      setPostImage(null);
+      setImagePreview(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      // subscribeToPosts will pick it up
+    } catch (err) {
+      console.error('Error creating post:', err);
+      alert('Failed to create post. Please try again.');
+    } finally {
+      setPosting(false);
+    }
   };
 
   return (
@@ -559,7 +564,14 @@ export default function FeedPage() {
         ) : (
           <div className="space-y-6">
             {posts.map((post) => (
-              <PostCard key={post.id} post={post} />
+              <PostCard
+                key={post.id}
+                post={post}
+                currentUser={currentUser}
+                onPostUpdated={handlePostUpdated}
+                onPostDeleted={handlePostDeletedLocally}
+                onLike={handleLike}
+              />
             ))}
           </div>
         )}
