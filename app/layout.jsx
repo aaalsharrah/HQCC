@@ -23,6 +23,10 @@ export const metadata = {
   description:
     'Explore, Build, and Collaborate in the frontier of quantum computing at Hofstra University',
   generator: 'v0.app',
+  verification: {
+    google: 'h1Bas-kLpiXROZWJh1yNX6MrBEA41HTU2PzEry8jUj4',
+  },
+
   icons: {
     icon: [
       {
